@@ -1,13 +1,23 @@
 import type { Request, Response, NextFunction } from "express";
+import { ApiError } from "../http/errors";
+import { assertCanReadContractor, contractorListWhere } from "../services/access.service";
 import { contractorService } from "../services/contractor.service";
 
+function requireUser(req: Request) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "unauthenticated");
+  }
+  return req.user;
+}
+
 export async function listContractors(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const contractors = await contractorService.list();
+    const actor = requireUser(req);
+    const contractors = await contractorService.list(contractorListWhere(actor));
     res.json({ contractors });
   } catch (error) {
     next(error);
@@ -20,7 +30,9 @@ export async function getContractor(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const actor = requireUser(req);
     const contractor = await contractorService.getById(req.params.contractorId);
+    await assertCanReadContractor(actor, contractor.id);
     res.json({ contractor });
   } catch (error) {
     next(error);

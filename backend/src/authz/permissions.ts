@@ -2,6 +2,8 @@ import type { Role } from "@prisma/client";
 import { authorize } from "../middleware/authorize";
 
 export const PERMISSIONS = {
+  PROJECT_WRITE: ["CONTRACTOR", "ADMIN"],
+  MILESTONE_WRITE: ["CONTRACTOR", "ADMIN"],
   EVIDENCE_UPLOAD: ["CONTRACTOR", "ADMIN"],
   EVIDENCE_READ: [
     "ADMIN",

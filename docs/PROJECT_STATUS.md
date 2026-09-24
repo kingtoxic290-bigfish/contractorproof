@@ -2,17 +2,90 @@
 
 This file is the Agent 1 task ledger. Update it after every task. Use only COMPLETE, PARTIAL, or BLOCKED.
 
-Last inspection: 2026-09-24 (TASK 0). No application features were implemented in TASK 0.
-
 ---
 
 ## CURRENT TASK
 
-TASK 0 — Repository baseline, Git control, architecture inspection, and this ledger.
+TASK 1 — Projects, Milestones & Ownership/IDOR
 
 ## STATUS
 
 COMPLETE
+
+---
+
+## TASK 1
+
+TASK:
+Projects, Milestones & Ownership/IDOR
+
+STATUS:
+COMPLETE
+
+IMPLEMENTED:
+
+* `POST /api/v1/projects` — CONTRACTOR creates against their own Contractor profile; ADMIN must supply `contractorId`. Client-supplied `contractorId` is ignored for CONTRACTOR.
+* `POST /api/v1/milestones` — body `{ projectId, name, description?, policyId? }`.
+* `POST /api/v1/projects/:projectId/milestones` — same create, project id from the path (frozen nested family).
+* `GET /api/v1/milestones/:milestoneId` — same read matrix as the parent project.
+
+AUTHORIZATION:
+
+* Write: `PROJECT_WRITE` / `MILESTONE_WRITE` = CONTRACTOR, ADMIN, plus `assertCanWriteProject` ownership.
+* Read lists: ADMIN / AUDITOR / PROCUREMENT_OFFICER see all; CONTRACTOR sees own rows only; CLIENT / CONSULTANT_ENGINEER get `[]` (no membership table).
+* Read detail: owner or privileged → 200; other authenticated users → 403; missing → 404.
+* GET envelopes stay grandfathered `{ projects }`, `{ project }`, `{ contractors }`, `{ milestones }`. POST create uses `{ data, meta }`.
+
+TESTS:
+
+* `npx vitest run test/projects.write.test.ts test/projects.test.ts test/contractors.test.ts test/qa/e2e.stage2-authz.test.ts test/qa/e2e.golden.test.ts` — 38/38 PASS
+* Evidence regression `test/evidence.test.ts test/evidence.http.test.ts` — 24/24 PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS
+* `npx vitest run --testTimeout=20000` — 203/203 PASS
+* Default `npm test` (5s timeout) still flakes first-in-file Argon2 tests under parallel load; not a Task 1 logic failure.
+
+FILES CREATED:
+
+* `backend/src/routes/milestones.routes.ts`
+* `backend/test/projects.write.test.ts`
+
+FILES MODIFIED:
+
+* `backend/src/authz/permissions.ts`
+* `backend/src/authz/index.ts`
+* `backend/src/services/access.service.ts`
+* `backend/src/repositories/project.repository.ts`
+* `backend/src/repositories/contractor.repository.ts`
+* `backend/src/services/project.service.ts`
+* `backend/src/services/contractor.service.ts`
+* `backend/src/controllers/projects.controller.ts`
+* `backend/src/controllers/contractors.controller.ts`
+* `backend/src/routes/projects.routes.ts`
+* `backend/src/routes/index.ts`
+* `backend/test/projects.test.ts`
+* `backend/test/contractors.test.ts`
+* `backend/test/qa/e2e.stage2-authz.test.ts`
+* `backend/test/qa/e2e.golden.test.ts`
+* `docs/PROJECT_STATUS.md`
+
+KNOWN LIMITATIONS:
+
+* CLIENT / CONSULTANT_ENGINEER still have no project membership model; they cannot read or write another contractor's projects (403 / empty list).
+* There is no `GET /api/v1/milestones` collection (only `GET /milestones/:milestoneId` and `GET /projects/:projectId/milestones`).
+* Stage 2 GET JSON remains grandfathered; create responses use `{ data, meta }`.
+* Default Vitest 5s timeout can still flake under full parallel `npm test`.
+
+NEXT TASK:
+TASK 2 — Blockchain foundation
+
+---
+
+## TASK 0 (baseline)
+
+STATUS: COMPLETE
+
+Commit: `03af5a03045b682c4ad7e4d440206f59ab8fe15d`
 
 ---
 
@@ -41,8 +114,8 @@ Mounted under `/api/v1` from `backend/src/routes/index.ts`.
 | Health | COMPLETE | `GET /health`, `GET /api/v1/health` |
 | Auth | COMPLETE | `POST /auth/register` (CONTRACTOR, CLIENT), `POST /auth/login`, `GET /auth/me` |
 | Privileged users | COMPLETE | `POST /users` ADMIN only |
-| Contractors GET | PARTIAL | Authenticate-only; no ownership filter |
-| Projects / milestones GET | PARTIAL | Authenticate-only; no `POST /projects` or `POST /milestones` |
+| Contractors GET | COMPLETE | Scoped: owner or privileged; CLIENT/CE empty / 403 |
+| Projects / milestones | COMPLETE | POST create + scoped GET; no membership for CLIENT/CE |
 | Evidence POST/GET | COMPLETE | SHA-256 + EvidenceVersion; no get-by-id / version HTTP |
 | Verification POST | COMPLETE | MATCH / MISMATCH / PENDING / UNAVAILABLE; does not write chain |
 | Attestation POST | COMPLETE | GET `/attestations` is 501 |

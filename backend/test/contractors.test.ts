@@ -1,7 +1,6 @@
 import request from "supertest";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
-import { contractorRepository } from "../src/repositories/contractor.repository";
 import { prisma } from "../src/repositories/prisma";
 
 type RegisteredAccount = {
@@ -115,17 +114,12 @@ describe("GET /api/v1/contractors", () => {
     assertNoSensitiveUserFields(response.body);
   });
 
-  it("returns an empty collection when there are no contractors", async () => {
+  it("returns an empty collection when the caller has no contractor access", async () => {
     const account = await registerAccount("CLIENT", "Empty List Viewer");
-    const spy = vi
-      .spyOn(contractorRepository, "listContractors")
-      .mockResolvedValueOnce([]);
 
     const response = await request(app)
       .get("/api/v1/contractors")
       .set("Authorization", `Bearer ${account.token}`);
-
-    spy.mockRestore();
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ contractors: [] });

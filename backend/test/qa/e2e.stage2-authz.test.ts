@@ -9,10 +9,10 @@ import {
   seedProjectWithPolicy,
 } from "./fixtures";
 
-describe("Stage 2 GET contractors/projects authorization review", () => {
+describe("Stage 2 GET contractors/projects authorization", () => {
   afterEach(cleanupQaUsers);
 
-  it("GET /contractors and GET /projects are authenticate-only and list another contractor's records", async () => {
+  it("does not list or return another contractor's records", async () => {
     const owner = await registerContractor("Listed Owner");
     const stranger = await registerContractor("Stranger Reader");
     const client = await registerClient("Listed Client");
@@ -23,36 +23,33 @@ describe("Stage 2 GET contractors/projects authorization review", () => {
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(contractors.status).toBe(200);
     const contractorIds = contractors.body.contractors.map((row: { id: string }) => row.id);
-    expect(contractorIds).toContain(owner.contractorId);
+    expect(contractorIds).toContain(stranger.contractorId);
+    expect(contractorIds).not.toContain(owner.contractorId);
     assertNoSecrets(contractors.body);
 
     const contractorDetail = await request(app)
       .get(`/api/v1/contractors/${owner.contractorId}`)
       .set("Authorization", `Bearer ${client.token}`);
-    expect(contractorDetail.status).toBe(200);
-    expect(contractorDetail.body.contractor.id).toBe(owner.contractorId);
-    expect(contractorDetail.body.contractor.user).not.toHaveProperty("passwordHash");
+    expect(contractorDetail.status).toBe(403);
     assertNoSecrets(contractorDetail.body);
 
     const projects = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(projects.status).toBe(200);
-    expect(projects.body.projects.map((row: { id: string }) => row.id)).toContain(project.id);
+    expect(projects.body.projects.map((row: { id: string }) => row.id)).not.toContain(project.id);
     assertNoSecrets(projects.body);
 
     const projectDetail = await request(app)
       .get(`/api/v1/projects/${project.id}`)
       .set("Authorization", `Bearer ${client.token}`);
-    expect(projectDetail.status).toBe(200);
-    expect(projectDetail.body.project.id).toBe(project.id);
+    expect(projectDetail.status).toBe(403);
     assertNoSecrets(projectDetail.body);
 
     const milestones = await request(app)
       .get(`/api/v1/projects/${project.id}/milestones`)
       .set("Authorization", `Bearer ${stranger.token}`);
-    expect(milestones.status).toBe(200);
-    expect(milestones.body.milestones.length).toBeGreaterThan(0);
+    expect(milestones.status).toBe(403);
   });
 
   it("still requires authentication for Stage 2 collection GETs", async () => {

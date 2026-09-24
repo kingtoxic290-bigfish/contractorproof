@@ -1,13 +1,28 @@
 import type { Request, Response, NextFunction } from "express";
+import { sendData } from "../http/envelope";
+import { ApiError } from "../http/errors";
+import {
+  assertCanReadMilestone,
+  assertCanReadProject,
+  projectListWhere,
+} from "../services/access.service";
 import { projectService } from "../services/project.service";
 
+function requireUser(req: Request) {
+  if (!req.user) {
+    throw new ApiError(401, "UNAUTHENTICATED", "unauthenticated");
+  }
+  return req.user;
+}
+
 export async function listProjects(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const projects = await projectService.list();
+    const actor = requireUser(req);
+    const projects = await projectService.list(projectListWhere(actor));
     res.json({ projects });
   } catch (error) {
     next(error);
@@ -20,8 +35,24 @@ export async function getProject(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const actor = requireUser(req);
     const project = await projectService.getById(req.params.projectId);
+    await assertCanReadProject(actor, project.id);
     res.json({ project });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createProject(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const project = await projectService.create(actor, req.body ?? {});
+    sendData(res, { project }, 201);
   } catch (error) {
     next(error);
   }
@@ -33,8 +64,57 @@ export async function listProjectMilestones(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const milestones = await projectService.listMilestones(req.params.projectId);
+    const actor = requireUser(req);
+    const project = await projectService.getById(req.params.projectId);
+    await assertCanReadProject(actor, project.id);
+    const milestones = await projectService.listMilestones(project.id);
     res.json({ milestones });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createProjectMilestone(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestone = await projectService.createMilestone(actor, {
+      ...(req.body ?? {}),
+      projectId: req.params.projectId,
+    });
+    sendData(res, { milestone }, 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function createMilestone(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestone = await projectService.createMilestone(actor, req.body ?? {});
+    sendData(res, { milestone }, 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getMilestone(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestone = await projectService.getMilestoneById(req.params.milestoneId);
+    await assertCanReadMilestone(actor, milestone.id);
+    res.json({ milestone });
   } catch (error) {
     next(error);
   }

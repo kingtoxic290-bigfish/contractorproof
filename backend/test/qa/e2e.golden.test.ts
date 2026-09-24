@@ -62,7 +62,9 @@ describe("E2E-001 golden ContractorProof lifecycle (implemented slice)", () => {
       .post("/api/v1/projects")
       .set("Authorization", `Bearer ${token}`)
       .send({ name: "HTTP Project" });
-    expect([404, 405]).toContain(postProject.status);
+    expect(postProject.status).toBe(201);
+    expect(postProject.body.data.project.name).toBe("HTTP Project");
+    expect(postProject.body.data.project.contractorId).toBe(contractor!.id);
 
     const upload = await uploadEvidence(token, milestone.id, originalBytes, "original.txt");
     expect(upload.status).toBe(201);

@@ -32,4 +32,19 @@ export const contractorRepository = {
       ...contractorWithPublicUser,
     });
   },
+
+  getContractorByUserId(userId: string): Promise<ContractorWithPublicUser | null> {
+    return prisma.contractor.findUnique({
+      where: { userId },
+      ...contractorWithPublicUser,
+    });
+  },
+
+  findAccessible(where: Prisma.ContractorWhereInput): Promise<ContractorWithPublicUser[]> {
+    return prisma.contractor.findMany({
+      where,
+      ...contractorWithPublicUser,
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+  },
 };

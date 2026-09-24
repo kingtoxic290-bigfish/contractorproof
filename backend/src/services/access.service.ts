@@ -68,6 +68,49 @@ export async function assertCanReadProject(actor: PublicUser, projectId: string)
   deny();
 }
 
+export async function assertCanReadContractor(
+  actor: PublicUser,
+  contractorId: string,
+): Promise<void> {
+  const contractor = await contractorRepository.getContractorById(contractorId);
+  if (!contractor) {
+    throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
+  }
+  if (PRIVILEGED_READ_ROLES.includes(actor.role)) {
+    return;
+  }
+  if (actor.role === Role.CONTRACTOR && contractor.userId === actor.id) {
+    return;
+  }
+  deny();
+}
+
+/**
+ * SQL where-clause for GET /projects. Same matrix as evidence list.
+ */
+export function projectListWhere(actor: PublicUser): Prisma.ProjectWhereInput {
+  if (PRIVILEGED_READ_ROLES.includes(actor.role)) {
+    return {};
+  }
+  if (actor.role === Role.CONTRACTOR) {
+    return { contractor: { userId: actor.id } };
+  }
+  return { id: { in: [] } };
+}
+
+/**
+ * SQL where-clause for GET /contractors. Same matrix as project list.
+ */
+export function contractorListWhere(actor: PublicUser): Prisma.ContractorWhereInput {
+  if (PRIVILEGED_READ_ROLES.includes(actor.role)) {
+    return {};
+  }
+  if (actor.role === Role.CONTRACTOR) {
+    return { userId: actor.id };
+  }
+  return { id: { in: [] } };
+}
+
 export async function assertCanWriteMilestone(
   actor: PublicUser,
   milestoneId: string,

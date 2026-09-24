@@ -1,8 +1,7 @@
 import { MilestoneStatus } from "@prisma/client";
 import request from "supertest";
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
-import { projectRepository } from "../src/repositories/project.repository";
 import { prisma } from "../src/repositories/prisma";
 
 type RegisteredAccount = {
@@ -149,15 +148,12 @@ describe("GET /api/v1/projects", () => {
     assertNoSensitiveUserFields(response.body);
   });
 
-  it("returns an empty collection when there are no projects", async () => {
+  it("returns an empty collection when the contractor has no projects", async () => {
     const account = await registerAccount("Empty Project Viewer");
-    const spy = vi.spyOn(projectRepository, "listProjects").mockResolvedValueOnce([]);
 
     const response = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${account.token}`);
-
-    spy.mockRestore();
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ projects: [] });

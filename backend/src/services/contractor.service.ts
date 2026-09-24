@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { HttpError } from "../middleware/errorHandler";
 import {
   contractorRepository,
@@ -36,8 +37,10 @@ function toPublicContractor(row: ContractorWithPublicUser): PublicContractor {
 }
 
 export const contractorService = {
-  async list(): Promise<PublicContractor[]> {
-    const rows = await contractorRepository.listContractors();
+  async list(where?: Prisma.ContractorWhereInput): Promise<PublicContractor[]> {
+    const rows = where
+      ? await contractorRepository.findAccessible(where)
+      : await contractorRepository.listContractors();
     return rows.map(toPublicContractor);
   },
 
