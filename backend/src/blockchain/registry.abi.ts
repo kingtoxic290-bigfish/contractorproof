@@ -1,0 +1,23 @@
+/** Human-readable ABI matching ContractorProofRegistry.sol. */
+export const REGISTRY_ABI = [
+  "function owner() view returns (address)",
+  "function recorders(address) view returns (bool)",
+  "function projectExists(bytes32) view returns (bool)",
+  "function eventExists(bytes32) view returns (bool)",
+  "function setRecorder(address recorder, bool authorized)",
+  "function registerProject(bytes32 projectId, bytes32 contractorId)",
+  "function recordVerification(bytes32 eventId, bytes32 projectId, bytes32 milestoneId, bytes32 evidenceHash, bytes32 actorId)",
+  "function recordAttestation(bytes32 eventId, bytes32 projectId, bytes32 evidenceHash, bytes32 actorId, bool approved)",
+  "function recordCorrection(bytes32 eventId, bytes32 previousEventId, bytes32 evidenceHash, bytes32 actorId)",
+  "function recordDispute(bytes32 eventId, bytes32 previousEventId, bytes32 actorId)",
+  "function recordResolution(bytes32 eventId, bytes32 disputeEventId, bytes32 actorId)",
+  "function recordVariation(bytes32 eventId, bytes32 previousEventId, bytes32 variationRef, bytes32 actorId)",
+  "event RecorderUpdated(address indexed recorder, bool authorized, uint256 timestamp)",
+  "event ProjectRegistered(bytes32 indexed projectId, bytes32 indexed contractorId, uint256 timestamp)",
+  "event VerificationRecorded(bytes32 indexed eventId, bytes32 indexed projectId, bytes32 milestoneId, bytes32 evidenceHash, bytes32 actorId, uint256 timestamp)",
+  "event AttestationRecorded(bytes32 indexed eventId, bytes32 indexed projectId, bytes32 evidenceHash, bytes32 actorId, bool approved, uint256 timestamp)",
+  "event CorrectionRecorded(bytes32 indexed eventId, bytes32 indexed previousEventId, bytes32 evidenceHash, bytes32 actorId, uint256 timestamp)",
+  "event DisputeRecorded(bytes32 indexed eventId, bytes32 indexed previousEventId, bytes32 actorId, uint256 timestamp)",
+  "event ResolutionRecorded(bytes32 indexed eventId, bytes32 indexed disputeEventId, bytes32 actorId, uint256 timestamp)",
+  "event VariationRecorded(bytes32 indexed eventId, bytes32 indexed previousEventId, bytes32 variationRef, bytes32 actorId, uint256 timestamp)",
+] as const;

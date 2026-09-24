@@ -1,0 +1,36 @@
+import { Router } from "express";
+import { healthRouter } from "./health.routes";
+import { authRouter } from "./auth.routes";
+import { usersRouter } from "./users.routes";
+import { contractorsRouter } from "./contractors.routes";
+import { projectsRouter } from "./projects.routes";
+import { evidenceRouter } from "./evidence.routes";
+import { attestationsRouter } from "./attestations.routes";
+import { verificationRouter } from "./verification.routes";
+import { disputesRouter } from "./disputes.routes";
+import { correctionsRouter } from "./corrections.routes";
+import { variationsRouter } from "./variations.routes";
+import { passportsRouter } from "./passports.routes";
+import { blockchainRouter } from "./blockchain.routes";
+import { publicRouter } from "./public.routes";
+import { crbRouter } from "./crb.routes";
+import { nestRouter } from "./nest.routes";
+
+export const apiRouter = Router();
+
+apiRouter.use("/health", healthRouter);
+apiRouter.use("/auth", authRouter);
+apiRouter.use("/users", usersRouter);
+apiRouter.use("/contractors", contractorsRouter);
+apiRouter.use("/projects", projectsRouter);
+apiRouter.use("/evidence", evidenceRouter);
+apiRouter.use("/attestations", attestationsRouter);
+apiRouter.use("/verification", verificationRouter);
+apiRouter.use("/disputes", disputesRouter);
+apiRouter.use("/corrections", correctionsRouter);
+apiRouter.use("/variations", variationsRouter);
+apiRouter.use("/passports", passportsRouter);
+apiRouter.use("/blockchain", blockchainRouter);
+apiRouter.use("/public", publicRouter);
+apiRouter.use("/integrations/crb", crbRouter);
+apiRouter.use("/integrations/nest", nestRouter);

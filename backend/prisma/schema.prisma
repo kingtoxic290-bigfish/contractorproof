@@ -1,0 +1,371 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CONTRACTOR
+  CLIENT
+  CONSULTANT_ENGINEER
+  PROCUREMENT_OFFICER
+  AUDITOR
+  ADMIN
+}
+
+enum EvidenceStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum AttestationDecision {
+  APPROVED
+  REJECTED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+enum BlockchainEventType {
+  PROJECT_REGISTERED
+  VERIFICATION
+  ATTESTATION
+  CORRECTION
+  DISPUTE
+  RESOLUTION
+  VARIATION
+}
+
+/// Fingerprint compare result. Not a workflow status and not EvidenceStatus.
+enum VerificationStatus {
+  MATCH
+  MISMATCH
+  PENDING
+  UNAVAILABLE
+}
+
+enum VerificationSource {
+  INTERNAL
+  PUBLIC
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  role         Role
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  contractor               Contractor?
+  uploadedEvidence         Evidence[]           @relation("EvidenceUploader")
+  createdEvidenceVersions  EvidenceVersion[]    @relation("EvidenceVersionCreator")
+  attestations             Attestation[]
+  disputes                 Dispute[]
+  corrections              Correction[]
+  variations               ContractVariation[]
+  auditLogs                AuditLog[]
+  blockchainEvents         BlockchainEvent[]    @relation("BlockchainEventActor")
+  verifications            Verification[]
+}
+
+model Contractor {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  legalName             String
+  crbRegistrationNumber String?
+  crbCategory           String?
+  crbType               String?
+  crbClass              String?
+  crbStatus             String?
+  crbLastVerifiedAt     DateTime?
+  crbSource             String    @default("SYNTHETIC_DEMO")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  projects Project[]
+
+  @@index([crbRegistrationNumber])
+}
+
+model Project {
+  id                    String    @id @default(uuid())
+  contractorId          String
+  contractor            Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  name                  String
+  description           String?
+  nestTenderReference   String?
+  nestContractReference String?
+  ocid                  String?
+  procuringEntity       String?
+  contractStatus        String?
+  contractStartDate     DateTime?
+  contractEndDate       DateTime?
+  nestSource            String    @default("SYNTHETIC_DEMO")
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  milestones           Milestone[]
+  verificationPolicies VerificationPolicy[]
+  variations           ContractVariation[]
+  blockchainEvents     BlockchainEvent[]
+
+  @@index([contractorId])
+  @@index([nestContractReference])
+  @@index([ocid])
+}
+
+model VerificationPolicy {
+  id                String   @id @default(uuid())
+  projectId         String?
+  project           Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  name              String
+  requiredApprovals Int      @default(1)
+  allowedRoles      Role[]
+  /// Display aliases such as SITE_INSPECTOR -> CONSULTANT_ENGINEER. Not extra login roles.
+  verifierLabels    Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  milestones Milestone[]
+
+  @@index([projectId])
+}
+
+model Milestone {
+  id          String          @id @default(uuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  policyId    String?
+  policy      VerificationPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  name        String
+  description String?
+  status      MilestoneStatus @default(PENDING)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  evidence     Evidence[]
+  attestations Attestation[]
+  disputes     Dispute[]
+  corrections  Correction[]
+
+  @@index([projectId])
+  @@index([policyId])
+}
+
+model Evidence {
+  id               String         @id @default(uuid())
+  milestoneId      String
+  milestone        Milestone      @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  uploadedById     String
+  uploadedBy       User           @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  /// Denormalized current version file name. Authority is EvidenceVersion.fileName.
+  fileName         String
+  /// Denormalized current version storage key. Authority is EvidenceVersion.storageReference.
+  storageKey       String
+  /// Denormalized current version MIME type. Authority is EvidenceVersion.mimeType.
+  mimeType         String
+  /// Denormalized current version size. Authority is EvidenceVersion.sizeBytes.
+  sizeBytes        Int
+  /// Denormalized current version SHA-256. Authority is EvidenceVersion.sha256.
+  sha256           String
+  status           EvidenceStatus @default(PENDING_VERIFICATION)
+  currentVersionId String?        @unique
+  currentVersion   EvidenceVersion? @relation("EvidenceCurrentVersion", fields: [currentVersionId, id], references: [id, evidenceId], onDelete: Restrict)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  versions     EvidenceVersion[] @relation("EvidenceVersions")
+  attestations Attestation[]
+  corrections  Correction[]
+  variations   ContractVariation[]
+
+  /// Uniqueness of the *current* hash on a milestone. Historical hashes live on EvidenceVersion.
+  @@unique([milestoneId, sha256])
+  @@unique([currentVersionId, id])
+  @@index([sha256])
+  @@index([uploadedById])
+}
+
+/// Immutable stored file + SHA-256. Do not update sha256 or storageReference after insert.
+model EvidenceVersion {
+  id               String   @id @default(uuid())
+  evidenceId       String
+  evidence         Evidence @relation("EvidenceVersions", fields: [evidenceId], references: [id], onDelete: Restrict)
+  currentFor       Evidence? @relation("EvidenceCurrentVersion")
+  versionNumber    Int
+  storageReference String
+  fileName         String
+  mimeType         String
+  sizeBytes        Int
+  /// Canonical application SHA-256: lowercase hex, 64 characters.
+  sha256           String
+  createdById      String?
+  createdBy        User?    @relation("EvidenceVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+
+  verifications Verification[]
+
+  @@unique([id, evidenceId])
+  @@unique([evidenceId, versionNumber])
+  @@unique([evidenceId, sha256])
+  @@index([evidenceId])
+  @@index([sha256])
+  @@index([createdById])
+}
+
+/// Append-only fingerprint compare. Not EvidenceStatus and not Attestation.
+model Verification {
+  id                  String              @id @default(uuid())
+  evidenceVersionId   String
+  evidenceVersion     EvidenceVersion     @relation(fields: [evidenceVersionId], references: [id], onDelete: Restrict)
+  status              VerificationStatus
+  presentedSha256     String?
+  authoritativeSha256 String
+  source              VerificationSource
+  requestedById       String?
+  requestedBy         User?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime            @default(now())
+
+  @@index([evidenceVersionId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([requestedById])
+}
+
+model Attestation {
+  id           String               @id @default(uuid())
+  milestoneId  String
+  milestone    Milestone            @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  evidenceId   String
+  evidence     Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  verifierId   String
+  verifier     User                 @relation(fields: [verifierId], references: [id], onDelete: Restrict)
+  verifierRole Role
+  decision     AttestationDecision
+  comment      String?
+  createdAt    DateTime             @default(now())
+
+  @@unique([evidenceId, verifierId])
+  @@index([milestoneId])
+  @@index([verifierId])
+}
+
+model BlockchainEvent {
+  id              String              @id @default(uuid())
+  projectId       String
+  project         Project             @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  eventType       BlockchainEventType
+  referenceId     String?
+  previousEventId String?
+  previousEvent   BlockchainEvent?    @relation("EventChain", fields: [previousEventId], references: [id], onDelete: Restrict)
+  nextEvents      BlockchainEvent[]   @relation("EventChain")
+  txHash          String?
+  blockNumber     Int?
+  evidenceHash    String?
+  actorId         String?
+  actor           User?               @relation("BlockchainEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  recordedAt      DateTime            @default(now())
+  createdAt       DateTime            @default(now())
+
+  disputesAsOriginal   Dispute[]           @relation("DisputeOriginalEvent")
+  disputesAsResolution Dispute[]           @relation("DisputeResolutionEvent")
+  corrections          Correction[]
+  variations           ContractVariation[]
+
+  @@index([projectId])
+  @@index([eventType])
+  @@index([previousEventId])
+  @@index([txHash])
+}
+
+model Dispute {
+  id                      String        @id @default(uuid())
+  milestoneId             String
+  milestone               Milestone     @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  raisedById              String
+  raisedBy                User          @relation(fields: [raisedById], references: [id], onDelete: Restrict)
+  status                  DisputeStatus @default(OPEN)
+  reason                  String
+  originalEventId         String?
+  originalEvent           BlockchainEvent? @relation("DisputeOriginalEvent", fields: [originalEventId], references: [id], onDelete: Restrict)
+  resolutionEventId       String?
+  resolutionEvent         BlockchainEvent? @relation("DisputeResolutionEvent", fields: [resolutionEventId], references: [id], onDelete: Restrict)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@index([milestoneId])
+  @@index([raisedById])
+  @@index([status])
+}
+
+model Correction {
+  id              String           @id @default(uuid())
+  milestoneId     String
+  milestone       Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  originalEventId String
+  originalEvent   BlockchainEvent  @relation(fields: [originalEventId], references: [id], onDelete: Restrict)
+  reason          String
+  evidenceId      String?
+  evidence        Evidence?        @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  actorId         String
+  actor           User             @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt       DateTime         @default(now())
+
+  @@index([milestoneId])
+  @@index([originalEventId])
+  @@index([actorId])
+}
+
+model ContractVariation {
+  id                 String          @id @default(uuid())
+  projectId          String
+  project            Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  previousEventId    String
+  previousEvent      BlockchainEvent @relation(fields: [previousEventId], references: [id], onDelete: Restrict)
+  variationReference String
+  reason             String
+  evidenceId         String?
+  evidence           Evidence?       @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  actorId            String
+  actor              User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  createdAt          DateTime        @default(now())
+
+  @@index([projectId])
+  @@index([previousEventId])
+  @@index([actorId])
+  @@unique([projectId, variationReference])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
