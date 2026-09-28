@@ -1,10 +1,12 @@
-import { Role } from "@prisma/client";
+import { BlockchainEventType, Role } from "@prisma/client";
+import { createHash } from "node:crypto";
 import request from "supertest";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
 import { prisma } from "../src/repositories/prisma";
 import { signAccessToken } from "../src/utils/jwt";
 import { hashPassword } from "../src/utils/password";
+import { setProofBlockchainWriterFactory } from "../src/services/proof.service";
 
 type Account = {
   token: string;
@@ -15,6 +17,7 @@ type Account = {
 const createdUserIds: string[] = [];
 const createdProjectIds: string[] = [];
 const createdDisputeIds: string[] = [];
+const createdEvidenceIds: string[] = [];
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`;
@@ -95,16 +98,79 @@ async function seedMilestone(owner: Account & { contractorId: string }, label: s
   return { project, milestone };
 }
 
+async function seedEvidenceWithMatch(milestoneId: string, actorId: string) {
+  const bytes = Buffer.from("immutable dispute evidence");
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const evidence = await prisma.evidence.create({
+    data: {
+      milestoneId,
+      uploadedById: actorId,
+      fileName: "immutable.txt",
+      storageKey: "test-only-storage-reference",
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+      sha256: hash,
+    },
+  });
+  createdEvidenceIds.push(evidence.id);
+  const version = await prisma.evidenceVersion.create({
+    data: {
+      evidenceId: evidence.id,
+      versionNumber: 1,
+      storageReference: "test-only-version-reference",
+      fileName: "immutable.txt",
+      mimeType: "text/plain",
+      sizeBytes: bytes.length,
+      sha256: hash,
+      createdById: actorId,
+    },
+  });
+  await prisma.evidence.update({ where: { id: evidence.id }, data: { currentVersionId: version.id } });
+  const verification = await prisma.verification.create({
+    data: {
+      evidenceVersionId: version.id,
+      status: "MATCH",
+      presentedSha256: hash,
+      authoritativeSha256: hash,
+      source: "INTERNAL",
+      requestedById: actorId,
+    },
+  });
+  return { evidence, version, verification, hash };
+}
+
 afterEach(async () => {
   const disputeIds = createdDisputeIds.splice(0);
   const projectIds = createdProjectIds.splice(0);
+  const evidenceIds = createdEvidenceIds.splice(0);
   const userIds = createdUserIds.splice(0);
 
   if (disputeIds.length > 0) {
+    await prisma.disputeResolution.deleteMany({ where: { disputeId: { in: disputeIds } } });
     await prisma.dispute.deleteMany({ where: { id: { in: disputeIds } } });
   }
   if (projectIds.length > 0) {
+    await prisma.disputeResolution.deleteMany({
+      where: { dispute: { milestone: { projectId: { in: projectIds } } } },
+    });
     await prisma.dispute.deleteMany({ where: { milestone: { projectId: { in: projectIds } } } });
+    await prisma.blockchainEvent.deleteMany({
+      where: { projectId: { in: projectIds }, eventType: { in: ["RESOLUTION", "DISPUTE"] } },
+    });
+    await prisma.blockchainEvent.deleteMany({ where: { projectId: { in: projectIds } } });
+  }
+  if (evidenceIds.length > 0) {
+    await prisma.verification.deleteMany({
+      where: { evidenceVersion: { evidenceId: { in: evidenceIds } } },
+    });
+    await prisma.evidence.updateMany({
+      where: { id: { in: evidenceIds } },
+      data: { currentVersionId: null },
+    });
+    await prisma.evidenceVersion.deleteMany({ where: { evidenceId: { in: evidenceIds } } });
+    await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
+  }
+  if (projectIds.length > 0) {
     await prisma.milestone.deleteMany({ where: { projectId: { in: projectIds } } });
     await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
   }
@@ -126,7 +192,7 @@ describe("POST /api/v1/disputes", () => {
       reason: "work does not match the drawing",
     });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -138,7 +204,7 @@ describe("POST /api/v1/disputes", () => {
         reason: "work does not match the drawing",
       });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
   });
 
   it("returns 400 when required fields are missing", async () => {
@@ -227,8 +293,6 @@ describe("POST /api/v1/disputes", () => {
         userId: other.userId,
         status: "RESOLVED",
         role: "ADMIN",
-        evidenceId: "11111111-1111-4111-8111-111111111188",
-        originalEventId: "11111111-1111-4111-8111-111111111177",
       });
     expect(response.status).toBe(201);
     expect(response.body).toMatchObject({
@@ -256,6 +320,7 @@ describe("POST /api/v1/disputes", () => {
     expect(row!.milestoneId).toBe(seeded.milestone.id);
     expect(row!.status).toBe("OPEN");
     expect(row!.originalEventId).toBeNull();
+    expect(row!.evidenceId).toBeNull();
     expect(row!.resolutionEventId).toBeNull();
   });
 
@@ -289,13 +354,68 @@ describe("POST /api/v1/disputes", () => {
       });
     expect(response.status).toBe(403);
   });
+
+  it("validates evidence references and preserves the original record", async () => {
+    const owner = await registerContractor("Evidence dispute owner");
+    const seeded = await seedMilestone(owner, "evidence-dispute");
+    const evidenceData = await seedEvidenceWithMatch(seeded.milestone.id, owner.userId);
+    const before = await prisma.verification.findUniqueOrThrow({ where: { id: evidenceData.verification.id } });
+    const missing = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ milestoneId: seeded.milestone.id, evidenceId: "11111111-1111-4111-8111-111111111111", reason: "missing evidence" });
+    expect(missing.status).toBe(404);
+    const created = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ milestoneId: seeded.milestone.id, evidenceId: evidenceData.evidence.id, reason: "challenge evidence" });
+    expect(created.status).toBe(201);
+    createdDisputeIds.push(created.body.data.dispute.id);
+    expect(created.body.data.dispute.evidenceId).toBe(evidenceData.evidence.id);
+    expect(await prisma.evidence.findUniqueOrThrow({ where: { id: evidenceData.evidence.id } })).toMatchObject({
+      sha256: evidenceData.hash,
+      currentVersionId: evidenceData.version.id,
+    });
+    expect(await prisma.evidenceVersion.findUniqueOrThrow({ where: { id: evidenceData.version.id } })).toMatchObject({
+      sha256: evidenceData.hash,
+      versionNumber: 1,
+    });
+    expect(await prisma.verification.findUniqueOrThrow({ where: { id: before.id } })).toMatchObject({
+      id: before.id,
+      status: "MATCH",
+      authoritativeSha256: before.authoritativeSha256,
+    });
+  });
+
+  it("does not create a dispute for a forbidden project", async () => {
+    const owner = await registerContractor("No-mutation owner");
+    const outsider = await registerContractor("No-mutation outsider");
+    const seeded = await seedMilestone(owner, "no-mutation");
+    const before = await prisma.dispute.count({ where: { milestoneId: seeded.milestone.id } });
+    const response = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${outsider.token}`)
+      .send({ milestoneId: seeded.milestone.id, reason: "must be denied" });
+    expect(response.status).toBe(403);
+    expect(await prisma.dispute.count({ where: { milestoneId: seeded.milestone.id } })).toBe(before);
+  });
+
+  it("allows distinct dispute records when the domain permits repeated challenges", async () => {
+    const owner = await registerContractor("Repeated disputes owner");
+    const seeded = await seedMilestone(owner, "repeated-disputes");
+    for (const reason of ["first challenge", "second challenge"]) {
+      const response = await request(app).post("/api/v1/disputes")
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ milestoneId: seeded.milestone.id, reason });
+      expect(response.status).toBe(201);
+      createdDisputeIds.push(response.body.data.dispute.id);
+    }
+    expect(await prisma.dispute.count({ where: { milestoneId: seeded.milestone.id } })).toBe(2);
+  });
 });
 
 describe("GET /api/v1/disputes", () => {
   it("returns 401 without a JWT", async () => {
     const response = await request(app).get("/api/v1/disputes");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -303,7 +423,7 @@ describe("GET /api/v1/disputes", () => {
       .get("/api/v1/disputes")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error.code).toBe("UNAUTHENTICATED");
   });
 
   it("returns 400 for a malformed filter UUID", async () => {
@@ -415,5 +535,193 @@ describe("GET /api/v1/disputes", () => {
       .set("Authorization", `Bearer ${client.token}`);
     expect(listed.status).toBe(200);
     expect(listed.body).toEqual({ data: { disputes: [] }, meta: {} });
+  });
+
+  it("returns 404 for unknown dispute detail and denies cross-project detail access", async () => {
+    const owner = await registerContractor("Detail owner");
+    const other = await registerContractor("Detail other");
+    const seeded = await seedMilestone(owner, "detail");
+    const created = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ milestoneId: seeded.milestone.id, reason: "detail access" });
+    expect(created.status).toBe(201);
+    createdDisputeIds.push(created.body.data.dispute.id);
+    const own = await request(app).get(`/api/v1/disputes/${created.body.data.dispute.id}`)
+      .set("Authorization", `Bearer ${owner.token}`);
+    expect(own.status).toBe(200);
+    expect(own.body.data.dispute.id).toBe(created.body.data.dispute.id);
+    const forbidden = await request(app).get(`/api/v1/disputes/${created.body.data.dispute.id}`)
+      .set("Authorization", `Bearer ${other.token}`);
+    expect(forbidden.status).toBe(403);
+    const missing = await request(app).get("/api/v1/disputes/11111111-1111-4111-8111-111111111111")
+      .set("Authorization", `Bearer ${owner.token}`);
+    expect(missing.status).toBe(404);
+    const unauthenticated = await request(app).get(`/api/v1/disputes/${created.body.data.dispute.id}`);
+    expect(unauthenticated.status).toBe(401);
+  });
+});
+
+describe("dispute review and resolution", () => {
+  it("appends a resolution once and preserves evidence versions and verification history", async () => {
+    const owner = await registerContractor("Resolution owner");
+    const admin = await privileged(Role.ADMIN);
+    const seeded = await seedMilestone(owner, "resolution");
+    const original = await seedEvidenceWithMatch(seeded.milestone.id, owner.userId);
+    const created = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ milestoneId: seeded.milestone.id, evidenceId: original.evidence.id, reason: "challenge a match" });
+    expect(created.status).toBe(201);
+    const disputeId = created.body.data.dispute.id as string;
+    createdDisputeIds.push(disputeId);
+
+    const review = await request(app).post(`/api/v1/disputes/${disputeId}/review`)
+      .set("Authorization", `Bearer ${admin.token}`).send({});
+    expect(review.status).toBe(200);
+    expect(review.body.data.dispute.status).toBe("UNDER_REVIEW");
+    const resolved = await request(app).post(`/api/v1/disputes/${disputeId}/resolutions`)
+      .set("Authorization", `Bearer ${admin.token}`)
+      .send({ status: "REJECTED", resolution: "The submitted challenge was reviewed" });
+    expect(resolved.status).toBe(201);
+    expect(resolved.body.data.dispute.status).toBe("REJECTED");
+    expect(resolved.body.data.resolution).toMatchObject({ status: "REJECTED", resolvedById: admin.userId });
+    const retry = await request(app).post(`/api/v1/disputes/${disputeId}/resolutions`)
+      .set("Authorization", `Bearer ${admin.token}`)
+      .send({ status: "REJECTED", resolution: "The submitted challenge was reviewed" });
+    expect(retry.status).toBe(201);
+    expect(retry.body.data.resolution.id).toBe(resolved.body.data.resolution.id);
+    const conflict = await request(app).post(`/api/v1/disputes/${disputeId}/resolutions`)
+      .set("Authorization", `Bearer ${admin.token}`)
+      .send({ status: "RESOLVED", resolution: "Conflicting second outcome" });
+    expect(conflict.status).toBe(409);
+
+    expect(await prisma.disputeResolution.count({ where: { disputeId } })).toBe(1);
+    expect(await prisma.evidence.findUniqueOrThrow({ where: { id: original.evidence.id } })).toMatchObject({
+      sha256: original.hash,
+      currentVersionId: original.version.id,
+    });
+    expect(await prisma.evidenceVersion.findUniqueOrThrow({ where: { id: original.version.id } })).toMatchObject({
+      sha256: original.hash,
+      versionNumber: 1,
+    });
+    expect(await prisma.verification.findUniqueOrThrow({ where: { id: original.verification.id } })).toMatchObject({
+      id: original.verification.id,
+      status: "MATCH",
+    });
+  });
+
+  it("denies unauthorized resolution and malformed outcomes", async () => {
+    const owner = await registerContractor("No resolution owner");
+    const seeded = await seedMilestone(owner, "no-resolution");
+    const created = await request(app).post("/api/v1/disputes")
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ milestoneId: seeded.milestone.id, reason: "challenge" });
+    createdDisputeIds.push(created.body.data.dispute.id);
+    const denied = await request(app).post(`/api/v1/disputes/${created.body.data.dispute.id}/resolutions`)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ status: "RESOLVED", resolution: "not permitted" });
+    expect(denied.status).toBe(403);
+    const invalid = await request(app).post(`/api/v1/disputes/${created.body.data.dispute.id}/resolutions`)
+      .set("Authorization", `Bearer ${(await privileged(Role.ADMIN)).token}`)
+      .send({ status: "OPEN", resolution: "invalid terminal result" });
+    expect(invalid.status).toBe(400);
+    expect((await prisma.dispute.findUniqueOrThrow({ where: { id: created.body.data.dispute.id } })).status).toBe("OPEN");
+  });
+
+  it("keeps a failed optional blockchain anchor pending without claiming confirmation", async () => {
+    const owner = await registerContractor("Pending dispute owner");
+    const seeded = await seedMilestone(owner, "pending-dispute");
+    const original = await prisma.blockchainEvent.create({
+      data: {
+        projectId: seeded.project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        referenceId: "original-verification",
+        logicalKey: `test:original:${seeded.project.id}`,
+        txHash: `0x${"1".repeat(64)}`,
+        blockNumber: 1,
+      },
+    });
+    const failedWriter = {
+      isConfigured: () => true,
+      canWrite: () => true,
+      projectIsRegistered: async () => true,
+      registerProject: async () => { throw new Error("unused"); },
+      recordProof: async () => { throw new Error("unused"); },
+      recordAttestation: async () => { throw new Error("unused"); },
+      recordDispute: async () => { throw new Error("RPC unavailable"); },
+      recordResolution: async () => { throw new Error("unused"); },
+    };
+    setProofBlockchainWriterFactory(() => failedWriter);
+    try {
+      const response = await request(app).post("/api/v1/disputes")
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ milestoneId: seeded.milestone.id, originalEventId: original.id, reason: "chain may be offline" });
+      expect(response.status).toBe(201);
+      createdDisputeIds.push(response.body.data.dispute.id);
+      expect(response.body.data.dispute.blockchainProof).toMatchObject({
+        eventType: "DISPUTE",
+        confirmationState: "PENDING",
+        confirmed: false,
+        txHash: null,
+        blockNumber: null,
+      });
+      const event = await prisma.blockchainEvent.findUniqueOrThrow({
+        where: { logicalKey: `DISPUTE:${seeded.project.id}:${response.body.data.dispute.id}` },
+      });
+      expect(event.txHash).toBeNull();
+      expect(event.blockNumber).toBeNull();
+    } finally {
+      setProofBlockchainWriterFactory(undefined);
+    }
+  });
+
+  it("confirms dispute and resolution events only after successful writer receipts", async () => {
+    const owner = await registerContractor("Confirmed dispute owner");
+    const admin = await privileged(Role.ADMIN);
+    const seeded = await seedMilestone(owner, "confirmed-dispute");
+    const original = await prisma.blockchainEvent.create({
+      data: {
+        projectId: seeded.project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        referenceId: "confirmed-original",
+        logicalKey: `test:confirmed-original:${seeded.project.id}`,
+        txHash: `0x${"3".repeat(64)}`,
+        blockNumber: 3,
+      },
+    });
+    const successfulWriter = {
+      isConfigured: () => true,
+      canWrite: () => true,
+      projectIsRegistered: async () => true,
+      registerProject: async () => { throw new Error("unused"); },
+      recordProof: async () => { throw new Error("unused"); },
+      recordAttestation: async () => { throw new Error("unused"); },
+      recordDispute: async () => ({ txHash: `0x${"4".repeat(64)}`, blockNumber: 4, evidenceHash: null }),
+      recordResolution: async () => ({ txHash: `0x${"5".repeat(64)}`, blockNumber: 5, evidenceHash: null }),
+    };
+    setProofBlockchainWriterFactory(() => successfulWriter);
+    try {
+      const created = await request(app).post("/api/v1/disputes")
+        .set("Authorization", `Bearer ${owner.token}`)
+        .send({ milestoneId: seeded.milestone.id, originalEventId: original.id, reason: "record on chain" });
+      expect(created.status).toBe(201);
+      createdDisputeIds.push(created.body.data.dispute.id);
+      expect(created.body.data.dispute.blockchainProof).toMatchObject({
+        eventType: "DISPUTE", txHash: `0x${"4".repeat(64)}`, blockNumber: 4,
+        confirmationState: "CONFIRMED", confirmed: true,
+      });
+      const resolved = await request(app).post(`/api/v1/disputes/${created.body.data.dispute.id}/resolutions`)
+        .set("Authorization", `Bearer ${admin.token}`)
+        .send({ status: "RESOLVED", resolution: "Resolution recorded" });
+      expect(resolved.status).toBe(201);
+      expect(resolved.body.data.blockchainProof).toMatchObject({
+        eventType: "RESOLUTION", txHash: `0x${"5".repeat(64)}`, blockNumber: 5,
+        confirmationState: "CONFIRMED", confirmed: true,
+      });
+      expect(await prisma.blockchainEvent.count({
+        where: { projectId: seeded.project.id, eventType: { in: ["DISPUTE", "RESOLUTION"] }, txHash: { not: null } },
+      })).toBe(2);
+    } finally {
+      setProofBlockchainWriterFactory(undefined);
+    }
   });
 });

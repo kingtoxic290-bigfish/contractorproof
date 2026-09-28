@@ -151,6 +151,12 @@ export async function cleanupQaUsers(): Promise<void> {
     include: { versions: true },
   });
   const evidenceIds = evidence.map((row) => row.id);
+  await prisma.disputeResolution.deleteMany({
+    where: { dispute: { milestone: { project: { contractor: { userId: { in: ids } } } } } },
+  });
+  await prisma.dispute.deleteMany({
+    where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
+  });
   for (const row of evidence) {
     for (const version of row.versions) {
       await localStorageService.remove(version.storageReference);
@@ -173,9 +179,6 @@ export async function cleanupQaUsers(): Promise<void> {
 
   await prisma.contractVariation.deleteMany({
     where: { project: { contractor: { userId: { in: ids } } } },
-  });
-  await prisma.dispute.deleteMany({
-    where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
   });
   await prisma.correction.deleteMany({
     where: { milestone: { project: { contractor: { userId: { in: ids } } } } },

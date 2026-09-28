@@ -224,6 +224,72 @@ export class BlockchainService {
     };
   }
 
+  async recordDispute(input: {
+    eventId: string;
+    previousEventId: string;
+    actorId: string;
+  }): Promise<ConfirmedProof> {
+    await this.assertReadyForWrites();
+    const encoded = {
+      eventId: this.encodeId(input.eventId, "eventId"),
+      previousEventId: this.encodeId(input.previousEventId, "previousEventId"),
+      actorId: this.encodeId(input.actorId, "actorId"),
+    };
+    const contract = this.getSignerContract();
+    let tx;
+    try {
+      tx = await contract.recordDispute(
+        encoded.eventId,
+        encoded.previousEventId,
+        encoded.actorId,
+      );
+    } catch (error) {
+      mapRevert(error);
+    }
+    const receipt = await this.waitForConfirmation(tx);
+    this.assertNamedEvent(receipt, "DisputeRecorded", encoded);
+    return {
+      txHash: receipt.hash,
+      blockNumber: Number(receipt.blockNumber),
+      evidenceHash: "",
+      eventId: input.eventId,
+      contractAddress: this.config.contractAddress,
+    };
+  }
+
+  async recordResolution(input: {
+    eventId: string;
+    disputeEventId: string;
+    actorId: string;
+  }): Promise<ConfirmedProof> {
+    await this.assertReadyForWrites();
+    const encoded = {
+      eventId: this.encodeId(input.eventId, "eventId"),
+      disputeEventId: this.encodeId(input.disputeEventId, "disputeEventId"),
+      actorId: this.encodeId(input.actorId, "actorId"),
+    };
+    const contract = this.getSignerContract();
+    let tx;
+    try {
+      tx = await contract.recordResolution(
+        encoded.eventId,
+        encoded.disputeEventId,
+        encoded.actorId,
+      );
+    } catch (error) {
+      mapRevert(error);
+    }
+    const receipt = await this.waitForConfirmation(tx);
+    this.assertNamedEvent(receipt, "ResolutionRecorded", encoded);
+    return {
+      txHash: receipt.hash,
+      blockNumber: Number(receipt.blockNumber),
+      evidenceHash: "",
+      eventId: input.eventId,
+      contractAddress: this.config.contractAddress,
+    };
+  }
+
   private encodeVerification(input: RecordProofInput) {
     const evidenceHash = this.encodeHash(input.evidenceHash);
     return {
@@ -356,6 +422,34 @@ export class BlockchainService {
       throw new BlockchainError(
         BLOCKCHAIN_ERROR_CODES.EVENT_MISMATCH,
         "confirmed proof event did not match the submitted identifiers",
+      );
+    }
+  }
+
+  private assertNamedEvent(
+    receipt: TransactionReceipt,
+    eventName: "DisputeRecorded" | "ResolutionRecorded",
+    expected: Record<string, string>,
+  ): void {
+    const match = receipt.logs
+      .map((log) => {
+        try {
+          return this.iface.parseLog({ topics: [...log.topics], data: log.data });
+        } catch {
+          return null;
+        }
+      })
+      .find((parsed) => parsed?.name === eventName);
+    if (!match) {
+      throw new BlockchainError(
+        BLOCKCHAIN_ERROR_CODES.EVENT_MISMATCH,
+        `confirmed transaction did not emit ${eventName}`,
+      );
+    }
+    if (Object.entries(expected).some(([name, value]) => match.args[name] !== value)) {
+      throw new BlockchainError(
+        BLOCKCHAIN_ERROR_CODES.EVENT_MISMATCH,
+        `confirmed ${eventName} did not match submitted identifiers`,
       );
     }
   }

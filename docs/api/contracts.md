@@ -317,44 +317,36 @@ Do not add `GET /public/evidence/:id` or `GET /public/hash/:hash`.
 
 ---
 
-## Disputes (current Stage 6 HTTP)
+## Disputes (Task 4 lifecycle)
 
-Envelope: `{ "data": { "dispute" | "disputes": ... }, "meta": {} }`  
-Not a Stage 2 resource-keyed collection.
+Responses use `{ "data": ..., "meta": {} }`; failures use the standard `{ "error": { "code", "message", "requestId" } }` envelope.
 
-Authz: project write/read via existing access helpers. CONTRACTOR cannot raise or list another contractor’s disputes.  
-CONTRACTOR cannot “resolve as verified” — there is no resolution route in this slice.
+Disputes refer to a milestone and may refer to existing evidence and an original blockchain event. Creating one never changes Evidence, EvidenceVersion, or Verification. A separate `DisputeResolution` stores the terminal result, actor, and timestamp; the dispute status is the current lifecycle projection.
 
-The Prisma `Dispute` model is authoritative: `milestoneId`, `raisedById`, `status`, `reason`.  
-It has no `evidenceId` and no EvidenceVersion relation. This slice does **not** create an EvidenceVersion or BlockchainEvent.  
-`originalEventId` / `resolutionEventId` are blockchain FKs and are not accepted or populated here.
-
-`status` ∈ OPEN | UNDER_REVIEW | RESOLVED | REJECTED. Create always stores `OPEN`. Client `status` is ignored.
+`status` ∈ OPEN | UNDER_REVIEW | RESOLVED | REJECTED. Create always stores `OPEN`; client-supplied status and actor identity are ignored. Resolver roles are ADMIN, AUDITOR, and PROCUREMENT_OFFICER. Valid terminal outcomes are RESOLVED and REJECTED.
 
 ### POST `/api/v1/disputes`
 
 Auth: JWT  
-Create roles: CONTRACTOR (own milestone/project), ADMIN.  
-CLIENT / CONSULTANT_ENGINEER pass the role gate but have no membership yet → 403.  
-AUDITOR / PROCUREMENT_OFFICER → 403.
+Create roles: CONTRACTOR (own milestone/project), ADMIN. Other roles are denied by the existing permission/access rules.
 
-Body: `{ "milestoneId", "reason" }`  
-Identity (`raisedById`) comes from the JWT. Client-supplied actor/status/evidence/event ids are ignored.
+Body: `{ "milestoneId", "reason", "evidenceId?", "originalEventId?" }`
+Identity (`raisedById`) comes from the JWT. Client-supplied actor/status are ignored. Evidence must belong to the milestone; original event must belong to the project.
 
-201: `{ "data": { "dispute": { "id", "milestoneId", "raisedById", "status": "OPEN", "reason", "createdAt", "updatedAt" } }, "meta": {} }`
+201: `{ "data": { "dispute": { "id", "milestoneId", "evidenceId", "raisedById", "status": "OPEN", "reason", "blockchainProof", "originalProof", "resolutions", "createdAt", "updatedAt" } }, "meta": {} }`
 
 400: missing/invalid `milestoneId`, missing `reason`  
 401: missing or invalid JWT  
 403: wrong role or CONTRACTOR using another contractor’s milestone  
 404: ADMIN + unknown milestone
 
-No unique constraint; duplicates are not mapped to 409.
+Distinct challenges are allowed; there is no uniqueness constraint. Invalid UUIDs/missing fields return 400; inaccessible projects return 403; missing authorized references return 404.
 
 ### GET `/api/v1/disputes`
 
 Auth: JWT  
 Query: optional `milestoneId` and/or `projectId`  
-Authz: project access, enforced in the SQL `where` clause
+Authz: existing project access rules and SQL filtering.
 
 | Role | Visible disputes |
 | --- | --- |
@@ -365,7 +357,19 @@ Authz: project access, enforced in the SQL `where` clause
 200: `{ "data": { "disputes": [ ... ] }, "meta": {} }`  
 Empty accessible set: `{ "data": { "disputes": [] }, "meta": {} }`
 
-There is no `GET /api/v1/disputes/:id` and no resolve endpoint.
+### GET `/api/v1/disputes/:disputeId`
+
+Returns the dispute after project-read authorization. Missing dispute returns 404; inaccessible project returns 403.
+
+### POST `/api/v1/disputes/:disputeId/review`
+
+Resolver roles only. OPEN transitions to UNDER_REVIEW. Repeating UNDER_REVIEW is idempotent; terminal disputes return 409.
+
+### POST `/api/v1/disputes/:disputeId/resolutions`
+
+Resolver roles only. Body: `{ "status": "RESOLVED" | "REJECTED", "resolution": "..." }`. Creates one immutable resolution record and updates the current status. A matching retry returns the existing resolution; a conflicting retry returns 409.
+
+Blockchain anchoring is optional and only attempted when an existing source event is confirmed. Pending rows are represented as PENDING without transaction hash/block number. No source event means no dispute/resolution proof. The contract was not changed.
 
 ## Corrections (current Stage 7 HTTP)
 

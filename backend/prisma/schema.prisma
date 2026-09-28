@@ -84,6 +84,7 @@ model User {
   auditLogs                AuditLog[]
   blockchainEvents         BlockchainEvent[]    @relation("BlockchainEventActor")
   verifications            Verification[]
+  disputeResolutions       DisputeResolution[]  @relation("DisputeResolutionActor")
 }
 
 model Contractor {
@@ -197,6 +198,7 @@ model Evidence {
   attestations Attestation[]
   corrections  Correction[]
   variations   ContractVariation[]
+  disputes     Dispute[]
 
   /// Uniqueness of the *current* hash on a milestone. Historical hashes live on EvidenceVersion.
   @@unique([milestoneId, sha256])
@@ -291,6 +293,7 @@ model BlockchainEvent {
 
   disputesAsOriginal   Dispute[]           @relation("DisputeOriginalEvent")
   disputesAsResolution Dispute[]           @relation("DisputeResolutionEvent")
+  disputesAsProof      Dispute[]           @relation("DisputeProofEvent")
   corrections          Correction[]
   variations           ContractVariation[]
 
@@ -304,20 +307,40 @@ model Dispute {
   id                      String        @id @default(uuid())
   milestoneId             String
   milestone               Milestone     @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  evidenceId              String?
+  evidence                Evidence?     @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
   raisedById              String
   raisedBy                User          @relation(fields: [raisedById], references: [id], onDelete: Restrict)
   status                  DisputeStatus @default(OPEN)
   reason                  String
+  disputeEventId          String?           @unique
+  disputeEvent            BlockchainEvent?  @relation("DisputeProofEvent", fields: [disputeEventId], references: [id], onDelete: Restrict)
   originalEventId         String?
   originalEvent           BlockchainEvent? @relation("DisputeOriginalEvent", fields: [originalEventId], references: [id], onDelete: Restrict)
   resolutionEventId       String?
   resolutionEvent         BlockchainEvent? @relation("DisputeResolutionEvent", fields: [resolutionEventId], references: [id], onDelete: Restrict)
+  resolutions             DisputeResolution[]
   createdAt               DateTime      @default(now())
   updatedAt               DateTime      @updatedAt
 
   @@index([milestoneId])
   @@index([raisedById])
   @@index([status])
+  @@index([evidenceId])
+}
+
+model DisputeResolution {
+  id           String       @id @default(uuid())
+  disputeId    String       @unique
+  dispute      Dispute      @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  status       DisputeStatus
+  resolution   String
+  resolvedById String
+  resolvedBy   User         @relation("DisputeResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime     @default(now())
+
+  @@index([resolvedById])
+  @@index([createdAt])
 }
 
 model Correction {

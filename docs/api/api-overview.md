@@ -26,7 +26,7 @@ Decision: [ADR-0004](../architecture/adr/ADR-0004-api-versioning.md)
 | Verification | `/api/v1/verification` | Working POST | `/verifications` retired |
 | Attestations | `/api/v1/attestations` | 501 | Phase 3 |
 | Passports | `/api/v1/passports` | 501 | Phase 4 derived projection |
-| Disputes | `/api/v1/disputes` | 501 | After evidence |
+| Disputes | `/api/v1/disputes` | 200 / 201 | Authenticated project access; append-only lifecycle |
 | Corrections | `/api/v1/corrections` | 501 | After evidence |
 | Variations | `/api/v1/variations` | 501 | After evidence |
 | Audit | `/api/v1/audit` | Missing | After writes exist |

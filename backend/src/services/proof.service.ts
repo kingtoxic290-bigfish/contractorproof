@@ -46,6 +46,16 @@ export type ProofBlockchainWriter = {
     actorId: string;
     approved: boolean;
   }): Promise<ConfirmedProof>;
+  recordDispute(input: {
+    eventId: string;
+    previousEventId: string;
+    actorId: string;
+  }): Promise<ConfirmedProof>;
+  recordResolution(input: {
+    eventId: string;
+    disputeEventId: string;
+    actorId: string;
+  }): Promise<ConfirmedProof>;
 };
 
 export type ProofView = {
@@ -257,5 +267,81 @@ export const proofService = {
     });
 
     return { attestationProof };
+  },
+
+  async anchorDispute(input: {
+    disputeId: string;
+    projectId: string;
+    originalEventId: string;
+    actorId: string;
+  }): Promise<ProofView | null> {
+    const chain = writer();
+    if (!chainWritesRequired(chain)) {
+      return null;
+    }
+
+    const { event, created } = await blockchainEventRepository.createPending({
+      projectId: input.projectId,
+      eventType: BlockchainEventType.DISPUTE,
+      referenceId: input.disputeId,
+      previousEventId: input.originalEventId,
+      actorId: input.actorId,
+    });
+
+    try {
+      return await confirmOrReuse({
+        event,
+        created,
+        evidenceHash: "",
+        submit: () =>
+          writer().recordDispute({
+            eventId: event.id,
+            previousEventId: input.originalEventId,
+            actorId: input.actorId,
+          }),
+      });
+    } catch {
+      // A dispute is a valid business record even if its optional chain anchor is
+      // unavailable. Return the persisted pending event without claiming proof.
+      const pending = await blockchainEventRepository.findById(event.id);
+      return toProofView(pending ?? event);
+    }
+  },
+
+  async anchorDisputeResolution(input: {
+    resolutionId: string;
+    projectId: string;
+    disputeEventId: string;
+    actorId: string;
+  }): Promise<ProofView | null> {
+    const chain = writer();
+    if (!chainWritesRequired(chain)) {
+      return null;
+    }
+
+    const { event, created } = await blockchainEventRepository.createPending({
+      projectId: input.projectId,
+      eventType: BlockchainEventType.RESOLUTION,
+      referenceId: input.resolutionId,
+      previousEventId: input.disputeEventId,
+      actorId: input.actorId,
+    });
+
+    try {
+      return await confirmOrReuse({
+        event,
+        created,
+        evidenceHash: "",
+        submit: () =>
+          writer().recordResolution({
+            eventId: event.id,
+            disputeEventId: input.disputeEventId,
+            actorId: input.actorId,
+          }),
+      });
+    } catch {
+      const pending = await blockchainEventRepository.findById(event.id);
+      return toProofView(pending ?? event);
+    }
   },
 };

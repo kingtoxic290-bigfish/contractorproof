@@ -43,6 +43,20 @@ function enableConfirmedTestWriter() {
       eventId: input.eventId,
       contractAddress: "0x0000000000000000000000000000000000000001",
     }),
+    recordDispute: async (input) => ({
+      txHash: `0x${"44".repeat(32)}`,
+      blockNumber: 44,
+      evidenceHash: "",
+      eventId: input.eventId,
+      contractAddress: "0x0000000000000000000000000000000000000001",
+    }),
+    recordResolution: async (input) => ({
+      txHash: `0x${"55".repeat(32)}`,
+      blockNumber: 55,
+      evidenceHash: "",
+      eventId: input.eventId,
+      contractAddress: "0x0000000000000000000000000000000000000001",
+    }),
   }));
 }
 

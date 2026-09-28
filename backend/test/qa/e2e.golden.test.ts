@@ -45,6 +45,8 @@ describe("E2E-001 golden ContractorProof lifecycle (implemented slice)", () => {
         if (failAttestationWrite) throw new Error("simulated transaction rejection");
         return { txHash: `0x${"33".repeat(32)}`, blockNumber: 3, evidenceHash: input.evidenceHash, eventId: input.eventId, contractAddress: "0x0000000000000000000000000000000000000001" };
       },
+      recordDispute: async (input) => ({ txHash: `0x${"44".repeat(32)}`, blockNumber: 4, evidenceHash: "", eventId: input.eventId, contractAddress: "0x0000000000000000000000000000000000000001" }),
+      recordResolution: async (input) => ({ txHash: `0x${"55".repeat(32)}`, blockNumber: 5, evidenceHash: "", eventId: input.eventId, contractAddress: "0x0000000000000000000000000000000000000001" }),
     }));
     const originalBytes = Buffer.from("contractorproof-golden-original-evidence");
     const expectedHash = independentSha256(originalBytes);

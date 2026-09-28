@@ -72,7 +72,7 @@ describe("evidence versions, disputes, corrections, and variations", () => {
       });
     expect(created.status).toBe(201);
     expect(created.body.data.dispute.status).toBe("OPEN");
-    expect(created.body.data.dispute).not.toHaveProperty("evidenceId");
+    expect(created.body.data.dispute.evidenceId).toBe(upload.body.data.evidence.id);
     assertNoSecrets(created.body);
 
     const listed = await request(app)

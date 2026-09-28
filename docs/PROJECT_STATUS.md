@@ -6,9 +6,48 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 3 — Derived Contractor Passport
+TASK 4 — Dispute Lifecycle
 
 ## STATUS
+
+COMPLETE
+
+Disputes support creation, project-scoped reads, review, and append-only terminal resolution. The
+original evidence, versions, and verification rows remain unchanged. Evidence/original event
+references are validated after authorization. Resolution actor and timestamp are stored in a
+separate `DisputeResolution` row; one resolution per dispute is enforced. Repeated identical
+resolution submissions reuse the persisted result, while a conflicting result returns 409.
+
+Blockchain anchoring uses existing contract `recordDispute` and `recordResolution` methods only
+when the referenced source proof is confirmed. Pending `BlockchainEvent` rows remain explicitly
+unconfirmed; chain failure leaves the dispute/resolution available as a database business record.
+Disputes without a confirmed source event have no blockchain proof. No contract changes were made.
+
+Authorization reuses existing project helpers. Contractors can create/read only for their own
+projects; ADMIN can create and existing privileged reader/resolver roles follow their access
+matrix. Cross-contractor reads/writes are denied before mutation. Passport was not changed.
+
+TESTS:
+
+* Focused dispute + history tests — 29/29 PASS
+* Passport tests — 8/8 PASS
+* Full backend — 222/222 PASS
+* Hardhat — 6/6 PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
+
+KNOWN LIMITATIONS:
+
+* Distinct disputes may be raised against the same milestone/evidence; no domain uniqueness rule
+  exists. Matching resolution retries are idempotent, but creating a dispute is not.
+* Blockchain dispute/resolution anchors are optional and require a previously confirmed source
+  event; the database lifecycle remains authoritative when no source proof is available.
+
+Commit hash is reported in the Task 4 completion report.
+
+---
+
+## TASK 3 — Derived Contractor Passport
 
 COMPLETE
 
@@ -99,7 +138,7 @@ KNOWN LIMITATIONS:
 * Live tests require Hardhat artifacts compiled under `contracts/artifacts`.
 
 NEXT TASK:
-TASK 2B — Verification and Attestation → Blockchain orchestration
+TASK 3 — Derived Contractor Passport
 
 ---
 
