@@ -1,31 +1,5 @@
 # ContractorProof — Frontend Status
 
-## Task 4 state: Contractors and projects workflow
-
-The protected contractor and project areas now consume the implemented backend APIs using the shared authenticated API client and strict response parsers.
-
-### Routes and endpoint composition
-
-- `/contractors` reads `GET /api/v1/contractors` and `GET /api/v1/projects`; contractor/project counts and associations are derived only from those backend responses.
-- `/contractors/:contractorId` reads `GET /api/v1/contractors/:contractorId` and `GET /api/v1/projects`; only returned projects whose `contractorId` matches the returned contractor are shown.
-- `/projects` reads `GET /api/v1/projects` and `GET /api/v1/contractors` to resolve contractor names only when the contractor is present in the authorized response.
-- `/projects/:projectId` reads `GET /api/v1/projects/:projectId` and the referenced contractor detail. It does not fetch milestones or evidence as part of Task 4.
-- `/projects/new` calls `POST /api/v1/projects` and navigates to the returned project only after a valid 201 response.
-
-### Authorization and form behavior
-
-- Project and contractor records are never expanded by frontend role checks; all displayed records originate in backend responses.
-- The creation control and route are presented to CONTRACTOR and ADMIN. The contractor form omits `contractorId`, leaving ownership binding to the backend. ADMIN selects an ID from the authenticated contractor list.
-- Optional project fields match the backend service contract. The form sends ISO timestamps for date inputs and handles backend validation, forbidden, and conflict responses.
-- Malformed contractor/project rows are rejected rather than silently dropped or rendered as empty collections. Existing API client handling continues to clear authentication on 401; 403 remains an error state.
-
-### Verification and limitations
-
-- Full frontend tests: 177/177 passed. Production build passed TypeScript and Vite.
-- Browser review covered contractor list/detail, project list/detail, and project creation at 1440px and 390px. No page-level horizontal overflow was detected; mobile navigation remained visible.
-- Live backend smoke test was not run: `backend/.env` and `backend/node_modules` are absent, port 4000 refuses connections, and no safe development credentials are configured. Browser-only intercepted fixtures were used only for visual inspection.
-- Project list and contractor list are independent backend scopes. Contractor names are omitted from the project list when no corresponding authorized contractor record is returned; project IDs remain visible as returned by the project API.
-
 ## Task 3 state: Real evidence verification dashboard
 
 The protected `/dashboard` route now renders an operational overview from the authenticated `GET /api/v1/passports` projection. It uses the centralized API client and the backend's project-scoped result; no dashboard endpoint, backend change, role-based data bypass, or synthetic product data was added.
@@ -52,6 +26,24 @@ The protected `/dashboard` route now renders an operational overview from the au
 - Full frontend tests: 164/164 passed. Production TypeScript/Vite build passed.
 - Desktop and 390px browser previews rendered without horizontal page overflow. No local backend was listening on port 4000, so live database-backed smoke testing could not be performed.
 - Proof details, passport variations/corrections, and backend verification rows are limited to fields returned by the current passport projection; no direct blockchain-event list or standalone verification-results list is available.
+
+## Task 4 state: Contractors + projects workflow wired to the real backend
+
+The contractor and project feature flows now use the actual backend contracts instead of placeholder or synthetic records. Contractor list/detail views use the authenticated `GET /api/v1/contractors` and `GET /api/v1/contractors/:contractorId` endpoints; project list/detail views use `GET /api/v1/projects` and `GET /api/v1/projects/:projectId`. The create-project form uses the real `POST /api/v1/projects` contract and respects the backend enrollment rules: only `CONTRACTOR` and `ADMIN` can reach the create page, while the backend remains the source of truth for validation and ownership checks.
+
+### Real workflow coverage
+
+- Contractors list and detail pages are backed by the authenticated backend response envelopes and no fake contractor rows are introduced.
+- Projects list and detail pages consume real backend payloads and preserve the project status/metadata shape returned by the API.
+- Project creation is implemented through the backend `sendData` response envelope, with required-name validation and backend rejection handling in the client.
+- Role gating for project creation stays aligned with the backend authorization contract; the UI only exposes the route to authorized roles.
+
+### Verification and limitations
+
+- Full frontend test suite: `cd frontend && npm test -- --run` — 168/168 PASS.
+- Production build: `cd frontend && npm run build` — PASS.
+- This task was validated in the current frontend test harness; no live local backend smoke test was executed in this environment.
+- The UI intentionally does not invent API fields or bypass backend authorization; all access decisions remain backend-backed.
 
 ## Task 2 state: Authentication and typed API client integrated
 

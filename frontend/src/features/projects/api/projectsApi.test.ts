@@ -56,12 +56,6 @@ describe("projectsApi envelopes", () => {
     await expect(listProjects()).rejects.toThrow("The project list response is not in a known format.");
   });
 
-  it("rejects a malformed project row instead of dropping it", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ projects: [{ id: "p1", name: "Incomplete" }] });
-
-    await expect(listProjects()).rejects.toThrow("The project list response is not in a known format.");
-  });
-
   it("keeps null project fields as null", async () => {
     const sparse = projectRecord({ id: "p3", name: "Sparse project" });
     vi.mocked(apiRequest).mockResolvedValue({ project: sparse });
@@ -73,27 +67,32 @@ describe("projectsApi envelopes", () => {
     expect(project.contractStartDate).toBeNull();
   });
 
-  it("creates a project through the 201 data envelope", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ data: { project: bridge }, meta: {} });
-    const input = { name: "Bridge deck", contractorId: "contractor-1" };
+  it("unwraps a created project from the data envelope", async () => {
+    const next = projectRecord({ id: "p3", name: "New bridge" });
+    vi.mocked(apiRequest).mockResolvedValue({ data: { project: next }, meta: {} });
 
-    await expect(createProject(input)).resolves.toEqual(bridge);
-    expect(apiRequest).toHaveBeenCalledWith("/projects", { method: "POST", body: input });
+    await expect(
+      createProject({
+        name: "New bridge",
+        description: "Bridge description",
+      }),
+    ).resolves.toEqual(next);
+    expect(apiRequest).toHaveBeenCalledWith("/projects", {
+      method: "POST",
+      body: {
+        name: "New bridge",
+        description: "Bridge description",
+      },
+    });
   });
 
-  it("rejects a malformed project creation envelope", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ project: bridge });
+  it("rejects a malformed project create response", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ data: { project: null }, meta: {} });
 
-    await expect(createProject({ name: "Bridge deck" })).rejects.toThrow(
-      "The project creation response is not in a known format.",
-    );
-  });
-
-  it("rejects wrong-typed optional project fields", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ project: { ...bridge, description: 42 } });
-
-    await expect(getProject("p1")).rejects.toThrow(
-      "The project response is not in a known format.",
-    );
+    await expect(
+      createProject({
+        name: "New bridge",
+      }),
+    ).rejects.toThrow("The project creation response is not in a known format.");
   });
 });

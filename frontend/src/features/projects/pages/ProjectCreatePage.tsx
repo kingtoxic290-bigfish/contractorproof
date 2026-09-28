@@ -1,128 +1,50 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ErrorState } from "../../../components/feedback/ErrorState";
-import { LoadingState } from "../../../components/feedback/LoadingState";
+import { FormEvent, useState } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { PageHeader } from "../../../components/ui/PageHeader";
-import { useAuth } from "../../../hooks/useAuth";
 import { ApiError } from "../../../services/api/errors";
-import { listContractors } from "../../contractors/api/contractorsApi";
-import type { PublicContractor } from "../../contractors/types";
-import { createProject, type CreateProjectInput } from "../api/projectsApi";
+import { createProject } from "../api/projectsApi";
 
-type ProjectForm = {
-  name: string;
-  description: string;
-  contractorId: string;
-  nestTenderReference: string;
-  nestContractReference: string;
-  ocid: string;
-  procuringEntity: string;
-  contractStatus: string;
-  contractStartDate: string;
-  contractEndDate: string;
-};
-
-const INITIAL_FORM: ProjectForm = {
-  name: "",
-  description: "",
-  contractorId: "",
-  nestTenderReference: "",
-  nestContractReference: "",
-  ocid: "",
-  procuringEntity: "",
-  contractStatus: "",
-  contractStartDate: "",
-  contractEndDate: "",
-};
+function normalizeError(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.message || "The server rejected this project.";
+  }
+  return error instanceof Error ? error.message : "The server rejected this project.";
+}
 
 export function ProjectCreatePage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const isAdmin = user?.role === "ADMIN";
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [contractors, setContractors] = useState<PublicContractor[]>([]);
-  const [contractorStatus, setContractorStatus] = useState<"idle" | "loading" | "loaded" | "error">(
-    isAdmin ? "loading" : "idle",
-  );
-  const [contractorError, setContractorError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    let active = true;
-    setContractorStatus("loading");
-    listContractors()
-      .then((records) => {
-        if (!active) return;
-        setContractors(records);
-        setContractorStatus("loaded");
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        setContractorError(cause instanceof Error ? cause.message : "Contractors could not be loaded.");
-        setContractorStatus("error");
-      });
-    return () => {
-      active = false;
-    };
-  }, [isAdmin]);
-
-  function update(field: keyof ProjectForm, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-    setFieldError(null);
-    setError(null);
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    const name = form.name.trim();
-    if (!name) {
-      setFieldError("Project name is required.");
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Project name is required.");
       return;
     }
-    if (isAdmin && !form.contractorId) {
-      setFieldError("Select a contractor for this project.");
-      return;
-    }
-
-    const input: CreateProjectInput = { name };
-    for (const key of [
-      "description",
-      "contractorId",
-      "nestTenderReference",
-      "nestContractReference",
-      "ocid",
-      "procuringEntity",
-      "contractStatus",
-    ] as const) {
-      const value = form[key].trim();
-      if (value && (key !== "contractorId" || isAdmin)) input[key] = value;
-    }
-    if (form.contractStartDate) input.contractStartDate = new Date(form.contractStartDate).toISOString();
-    if (form.contractEndDate) input.contractEndDate = new Date(form.contractEndDate).toISOString();
 
     setSubmitting(true);
     setError(null);
-    setFieldError(null);
+    setSuccessId(null);
+
     try {
-      const project = await createProject(input);
-      navigate(`/projects/${encodeURIComponent(project.id)}`, {
-        state: { notice: "Project created successfully." },
+      const created = await createProject({
+        name: trimmed,
+        description: description.trim() || undefined,
+        contractStatus: status.trim() || undefined,
       });
-    } catch (cause) {
-      if (cause instanceof ApiError && cause.status === 400) {
-        setFieldError(cause.message);
-      } else if (cause instanceof ApiError && cause.status === 403) {
-        setError("The backend did not authorize project creation for this account.");
-      } else if (cause instanceof ApiError && cause.status === 409) {
-        setError(cause.message || "The project conflicts with an existing record.");
-      } else {
-        setError(cause instanceof Error ? cause.message : "Project creation failed.");
-      }
+      setSuccessId(created.id);
+      setName("");
+      setDescription("");
+      setStatus("");
+    } catch (caught) {
+      setError(normalizeError(caught));
     } finally {
       setSubmitting(false);
     }
@@ -131,87 +53,85 @@ export function ProjectCreatePage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Create project"
-        description={isAdmin
-          ? "Create a project for a contractor returned by the authenticated contractor API."
-          : "Create a project for the contractor account authenticated by your session."}
+        title="New project"
+        description="Create a project using the backend's real create endpoint. The backend remains authoritative for role checks and validation."
       />
-      <p>
-        <Link className="text-sm font-semibold text-teal-900 underline underline-offset-4" to="/projects">
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          to="/projects"
+          className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+        >
           Back to projects
         </Link>
-      </p>
-      {error ? <ErrorState message={error} /> : null}
-      {isAdmin && contractorStatus === "error" ? <ErrorState message={contractorError ?? "Contractors could not be loaded."} /> : null}
-      {isAdmin && contractorStatus === "loading" ? <LoadingState message="Loading authorized contractors..." /> : null}
-      <Card title="Project information" description="Only fields supported by the project API are included.">
-        <form className="space-y-5" onSubmit={(event) => void submit(event)} noValidate>
-          {isAdmin ? (
-            <label className="block text-sm font-medium text-stone-800">
-              Contractor <span aria-hidden="true">*</span>
-              <select
-                className="mt-1 block min-h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2"
-                value={form.contractorId}
-                onChange={(event) => update("contractorId", event.target.value)}
-                required
-                disabled={contractorStatus !== "loaded" || contractors.length === 0}
-              >
-                <option value="">Select a contractor</option>
-                {contractors.map((contractor) => (
-                  <option value={contractor.id} key={contractor.id}>{contractor.legalName}</option>
-                ))}
-              </select>
-            </label>
+      </div>
+
+      <Card title="Create project" description="Only required fields are enforced on the client; the backend validates the final payload.">
+        <form className="grid gap-4" onSubmit={onSubmit} noValidate>
+          <label className="block text-sm" htmlFor="project-name">
+            <span className="mb-1 block font-medium text-stone-800">Project name</span>
+            <input
+              id="project-name"
+              type="text"
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value);
+                if (error === "Project name is required.") {
+                  setError(null);
+                }
+              }}
+              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              aria-invalid={Boolean(error && !name.trim())}
+              required
+            />
+          </label>
+
+          <label className="block text-sm" htmlFor="project-description">
+            <span className="mb-1 block font-medium text-stone-800">Description</span>
+            <textarea
+              id="project-description"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className="min-h-[120px] w-full rounded-md border border-stone-300 bg-white px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+            />
+          </label>
+
+          <label className="block text-sm" htmlFor="project-status">
+            <span className="mb-1 block font-medium text-stone-800">Status</span>
+            <input
+              id="project-status"
+              type="text"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              placeholder="For example: ACTIVE"
+            />
+          </label>
+
+          {error ? (
+            <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </div>
           ) : null}
-          <TextField label="Project name" required value={form.name} onChange={(value) => update("name", value)} />
-          <TextField label="Description" value={form.description} onChange={(value) => update("description", value)} multiline />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <TextField label="Contract status" value={form.contractStatus} onChange={(value) => update("contractStatus", value)} />
-            <TextField label="Procuring entity" value={form.procuringEntity} onChange={(value) => update("procuringEntity", value)} />
-            <TextField label="NeST tender reference" value={form.nestTenderReference} onChange={(value) => update("nestTenderReference", value)} />
-            <TextField label="NeST contract reference" value={form.nestContractReference} onChange={(value) => update("nestContractReference", value)} />
-            <TextField label="Open Contracting ID" value={form.ocid} onChange={(value) => update("ocid", value)} />
-            <TextField label="Contract start date" type="date" value={form.contractStartDate} onChange={(value) => update("contractStartDate", value)} />
-            <TextField label="Contract end date" type="date" value={form.contractEndDate} onChange={(value) => update("contractEndDate", value)} />
+
+          {successId ? (
+            <div className="space-y-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
+              <p>Project created successfully.</p>
+              <Link
+                to={`/projects/${encodeURIComponent(successId)}`}
+                className="inline-flex items-center rounded-md bg-emerald-700 px-3 py-2 font-medium text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
+              >
+                Open project
+              </Link>
+            </div>
+          ) : null}
+
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating..." : "Create project"}
+            </Button>
           </div>
-          {fieldError ? <p className="text-sm font-medium text-red-800" role="alert">{fieldError}</p> : null}
-          <Button
-            type="submit"
-            disabled={submitting || (isAdmin && (contractorStatus !== "loaded" || contractors.length === 0))}
-          >
-            {submitting ? "Creating project..." : "Create project"}
-          </Button>
-          {submitting ? <LoadingState message="Creating project..." /> : null}
         </form>
       </Card>
     </section>
-  );
-}
-
-function TextField({
-  label,
-  value,
-  onChange,
-  required = false,
-  type = "text",
-  multiline = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  type?: string;
-  multiline?: boolean;
-}) {
-  const inputClass = "mt-1 block min-h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800";
-  return (
-    <label className="block min-w-0 text-sm font-medium text-stone-800">
-      {label}{required ? <span aria-hidden="true"> *</span> : null}
-      {multiline ? (
-        <textarea className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} rows={3} />
-      ) : (
-        <input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} type={type} required={required} />
-      )}
-    </label>
   );
 }

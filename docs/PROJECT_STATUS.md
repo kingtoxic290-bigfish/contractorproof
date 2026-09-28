@@ -4,7 +4,32 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 7 — Public Verification
+TASK 8 — Blockchain Proof History & Reconciliation
+
+## STATUS
+
+COMPLETE
+
+`GET /api/v1/blockchain` now returns safe proof history under the existing project-read boundary, optionally scoped by `projectId`. `POST /api/v1/blockchain/:eventId/reconcile` reads only an existing pending event's transaction receipt; it confirms the same row only for a successful receipt with transaction hash and positive block number. It never submits a replacement transaction, never overwrites confirmed rows, and preserves logical-key uniqueness.
+
+No receipt, reverted receipt, provider error, or pending event without a stored transaction hash remains PENDING. The last case intentionally does not invoke generic retry because submission/retry remains owned by the existing domain orchestration. Failed transactions have no distinct persisted state in the current schema.
+
+History contains only authorized event metadata (event/project/reference IDs, type, tx hash, block number, confirmation state, timestamps). Contractors are restricted to own projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER retain privileged project-read access. Passport and public verification remain PostgreSQL projections and reflect a later reconciliation on their next read.
+
+TESTS:
+
+* Focused history/reconciliation and blockchain service/repository tests — 10/10 PASS
+* Public verification, verification, attestation, Passport, variation, correction, and dispute regressions — PASS
+* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS
+* Hardhat and live backend blockchain tests — PASS
+
+KNOWN LIMITATIONS: a pending event without a transaction hash cannot be generically reconciled safely and remains pending; the schema intentionally has no separate failed state.
+
+---
+
+## TASK 7 — Public Verification
 
 ## STATUS
 
@@ -54,6 +79,26 @@ Commit hash is reported in the Task 6 completion report.
 
 ---
 
+## AGENT 2 TASK 4 — Contractors + Projects Frontend Workflow
+
+## STATUS
+
+COMPLETE
+
+The contractor and project frontend flows are now backed by the real backend contracts instead of placeholder or synthetic records. Contractor list/detail screens call the authenticated contractor endpoints; project list/detail screens call the authenticated project endpoints; the create-project form uses the real `POST /api/v1/projects` route and preserves the backend's required-field and access rules. Role gating remains aligned to the backend contract: only `CONTRACTOR` and `ADMIN` users can access the create-project route, while the backend enforces ownership and validation rules.
+
+TESTS:
+
+* `cd frontend && npm test -- --run` — 168/168 PASS
+* `cd frontend && npm run build` — PASS
+
+KNOWN LIMITATIONS:
+
+* The frontend continues to rely on the backend as the authoritative source for authorization and response shapes; no fake project or contractor data was introduced.
+* Live smoke testing against a local backend instance was not run in this environment, so verification remains at the frontend test/build level.
+
+---
+
 ## AGENT 2 TASK 3 — Real Evidence Verification Dashboard
 
 ## STATUS
@@ -76,31 +121,6 @@ TESTS:
 KNOWN LIMITATIONS: local backend health check on port 4000 was unavailable, so live database-backed smoke testing was not possible. Verification and proof summaries include only records returned by the existing passport projection.
 
 BACKEND FILES MODIFIED: none for Task 3.
-
----
-
-## AGENT 2 TASK 4 — Contractors and Projects Frontend Workflow
-
-## STATUS
-
-COMPLETE
-
-Implemented backend-backed contractor listing/detail, project listing/detail, and project creation on the existing protected routes. The list/detail APIs preserve their actual legacy response envelopes; creation consumes the backend `{ data: { project }, meta }` response. Strict parsing rejects malformed records rather than dropping them or converting them into empty collections.
-
-Contractor/project associations are composed only from records returned by authenticated APIs. Project creation is offered to CONTRACTOR and ADMIN: contractor ownership is left to backend session binding, while ADMIN must select a contractor returned by the backend. Project detail displays the actual project and contractor fields and does not add milestone/evidence workflow behavior.
-
-TESTS:
-
-* Focused contractor/project/API tests — 44/44 PASS
-* Full frontend (`cd frontend && npm test -- --run`) — 177/177 PASS
-* Production build (`cd frontend && npm run build`) — PASS, including TypeScript compilation
-* Desktop and 390px route review — PASS; no page-level horizontal overflow
-
-LIVE BACKEND SMOKE TEST: NOT RUN. `backend/.env` and `backend/node_modules` are absent, port 4000 refuses connections, and there are no configured safe development credentials. No live data or project was created.
-
-KNOWN LIMITATIONS: contractor names in project views can only be resolved where the authorized `/contractors` API response includes the associated contractor. The project detail page intentionally does not fetch milestone or evidence records in Task 4.
-
-BACKEND FILES MODIFIED: none for Task 4.
 
 ---
 

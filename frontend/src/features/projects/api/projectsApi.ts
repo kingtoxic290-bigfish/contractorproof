@@ -1,6 +1,19 @@
 import { apiRequest } from "../../../services/api/client";
-import { unwrapNamedList, unwrapNamedRecord } from "../../shared/query";
+import { isPlainRecord, unwrapNamedList, unwrapNamedRecord } from "../../shared/query";
 import { parsePublicProject, type PublicProject } from "../types";
+
+export type ProjectCreateInput = {
+  name: string;
+  description?: string;
+  contractorId?: string;
+  nestTenderReference?: string;
+  nestContractReference?: string;
+  ocid?: string;
+  procuringEntity?: string;
+  contractStatus?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+};
 
 export async function listProjects(): Promise<PublicProject[]> {
   const payload = await apiRequest<unknown>("/projects");
@@ -19,7 +32,7 @@ export async function listProjects(): Promise<PublicProject[]> {
 }
 
 export async function getProject(projectId: string): Promise<PublicProject> {
-  const payload = await apiRequest<unknown>(`/projects/${encodeURIComponent(projectId)}`);
+  const payload = await apiRequest<unknown>(`/projects/${projectId}`);
   const record = unwrapNamedRecord(payload, "project");
   const project = record ? parsePublicProject(record) : null;
   if (!project) {
@@ -28,35 +41,25 @@ export async function getProject(projectId: string): Promise<PublicProject> {
   return project;
 }
 
-export type CreateProjectInput = {
-  name: string;
-  description?: string;
-  contractorId?: string;
-  nestTenderReference?: string;
-  nestContractReference?: string;
-  ocid?: string;
-  procuringEntity?: string;
-  contractStatus?: string;
-  contractStartDate?: string;
-  contractEndDate?: string;
-};
-
-export async function createProject(input: CreateProjectInput): Promise<PublicProject> {
+export async function createProject(input: ProjectCreateInput): Promise<PublicProject> {
   const payload = await apiRequest<unknown>("/projects", {
     method: "POST",
-    body: input,
+    body: {
+      name: input.name,
+      ...(input.description ? { description: input.description } : {}),
+      ...(input.contractorId ? { contractorId: input.contractorId } : {}),
+      ...(input.nestTenderReference ? { nestTenderReference: input.nestTenderReference } : {}),
+      ...(input.nestContractReference ? { nestContractReference: input.nestContractReference } : {}),
+      ...(input.ocid ? { ocid: input.ocid } : {}),
+      ...(input.procuringEntity ? { procuringEntity: input.procuringEntity } : {}),
+      ...(input.contractStatus ? { contractStatus: input.contractStatus } : {}),
+      ...(input.contractStartDate ? { contractStartDate: input.contractStartDate } : {}),
+      ...(input.contractEndDate ? { contractEndDate: input.contractEndDate } : {}),
+    },
   });
-  if (
-    typeof payload !== "object" ||
-    payload === null ||
-    !("data" in payload) ||
-    typeof payload.data !== "object" ||
-    payload.data === null ||
-    !("project" in payload.data)
-  ) {
-    throw new Error("The project creation response is not in a known format.");
-  }
-  const project = parsePublicProject(payload.data.project);
+
+  const record = isPlainRecord(payload) && isPlainRecord(payload.data) ? payload.data.project : undefined;
+  const project = record ? parsePublicProject(record) : null;
   if (!project) {
     throw new Error("The project creation response is not in a known format.");
   }
