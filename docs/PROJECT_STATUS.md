@@ -6,11 +6,16 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 2A — Blockchain Foundation
+TASK 3 — Derived Contractor Passport
 
 ## STATUS
 
 COMPLETE
+
+Passport is a read-only projection over Contractor, Project, Milestone, EvidenceVersion,
+Verification, Attestation, and BlockchainEvent records. No Passport table or blockchain
+read calls were added. GET `/api/v1/passports` lists projects available to the caller;
+GET `/api/v1/passports/:projectId` applies the existing project read authorization.
 
 ---
 
@@ -170,7 +175,7 @@ Mounted under `/api/v1` from `backend/src/routes/index.ts`.
 | Disputes POST/GET | PARTIAL | Create OPEN only; no resolve; no chain event |
 | Corrections POST/GET | PARTIAL | Requires existing `BlockchainEvent`; HTTP never creates those |
 | Variations | NOT IMPLEMENTED | GET/POST 501 |
-| Passports | NOT IMPLEMENTED | GET 501 |
+| Passports | COMPLETE (TASK 3) | Derived read-only projection; authenticated list and project detail endpoints |
 | Blockchain HTTP | NOT IMPLEMENTED | GET 501; `BlockchainService` is not called from routes |
 | Public verify POST | COMPLETE | Unauthenticated compare; GET is scaffold JSON |
 | CRB / NeST | PARTIAL | Authenticated mocks, `SYNTHETIC_DEMO` |
@@ -214,25 +219,21 @@ No Passport table (ADR-0007). `BlockchainEvent` has unique `logicalKey`; confirm
 
 ---
 
-## Tests (last measured on this machine, TASK 2A)
+## Tests (latest measured, TASK 3)
 
 | Suite | Result |
 | --- | --- |
-| `cd contracts && npm test` | 6/6 PASS |
-| `cd backend && npx prisma validate` | PASS |
-| `cd backend && npx tsc --noEmit` | PASS |
-| Task 2B targeted backend slice | PASS (32/32 before the final failure-case assertions; golden path rerun PASS after those assertions) |
-| `cd backend && npm test` | PASS (33 files, 209 tests) |
+| Targeted Passport + golden path | PASS (9/9) |
+| `cd backend && npm test` | PASS (34 files, 214 tests) |
 | `cd contracts && npm test` | PASS (6/6) |
 | `cd backend && npx tsc --noEmit` | PASS |
-| `cd backend && npx prisma validate` | PASS (Prisma reports existing package.json configuration deprecation warning) |
+| `cd backend && npx prisma validate` | PASS (existing Prisma package.json configuration deprecation warning) |
 
 ---
 
 ## KNOWN ISSUES
 
 - Blockchain proofs are optional when no writable registry is configured; API returns `proof: null` and does not claim confirmation.
-- `GET /passports` and `GET /passports/:projectId` return 501.
 - `GET /blockchain`, GET/POST `/variations` return 501.
 - Corrections require an existing `BlockchainEvent`; HTTP does not create those yet.
 - Frontend public verify page is a stub; disputes/corrections pages are placeholders.
@@ -243,4 +244,29 @@ No Passport table (ADR-0007). `BlockchainEvent` has unique `logicalKey`; confirm
 
 ## NEXT TASK
 
-TASK 3 — Passport backend
+Awaiting next assignment.
+
+---
+
+## TASK 3 — Derived Contractor Passport
+
+STATUS: COMPLETE
+
+IMPLEMENTATION:
+
+* `GET /api/v1/passports` returns derived passports for the caller's accessible projects.
+* `GET /api/v1/passports/:projectId` returns a derived project passport after `assertCanReadProject` authorization.
+* The projection includes safe contractor/CRB fields, project and milestone details, evidence status, every evidence version and hash, persisted verification states, attestations with verifier role only, and VERIFICATION/ATTESTATION BlockchainEvents.
+* Proofs are confirmed only when both transaction hash and positive block number exist. Pending/partial events are marked `PENDING`, `confirmed: false`; absent proofs are `null` or an empty collection.
+* No Passport table, file contents/paths, verifier identifiers, credentials, or trust score were added.
+
+TESTS:
+
+* Targeted Passport tests cover authentication, owner access, cross-contractor denial, unknown projects, list scoping, all verification states, historical versions, attestations, confirmed and pending proofs, no-proof projections, and safe fields.
+* The golden path now reads the passport after verification and attestation proofs are persisted.
+* Final targeted/backend/TypeScript/Prisma/Hardhat results and commit hash are recorded in the Task 3 completion report.
+
+KNOWN LIMITATIONS:
+
+* Passport lists are not paginated.
+* Passport is a database snapshot; it does not query EVM state or independently revalidate transactions.

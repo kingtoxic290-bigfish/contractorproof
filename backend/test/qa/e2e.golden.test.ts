@@ -261,8 +261,14 @@ describe("E2E-001 golden ContractorProof lifecycle (implemented slice)", () => {
     const passport = await request(app)
       .get(`/api/v1/passports/${project.id}`)
       .set("Authorization", `Bearer ${auditor.token}`);
-    expect(passport.status).toBe(501);
-    expect(passport.body.resource).toBe("passports");
+    expect(passport.status).toBe(200);
+    expect(passport.body.data.passport.project.id).toBe(project.id);
+    expect(passport.body.data.passport.blockchainProofs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventType: "VERIFICATION", confirmed: true }),
+        expect.objectContaining({ eventType: "ATTESTATION", confirmed: true }),
+      ]),
+    );
     assertNoSecrets(passport.body);
 
     const publicVerify = await request(app)

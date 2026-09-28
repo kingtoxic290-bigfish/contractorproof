@@ -16,19 +16,20 @@ import {
 describe("passport and public verification", () => {
   afterEach(cleanupQaUsers);
 
-  it("keeps GET /passports unimplemented and does not invent a 200 projection", async () => {
+  it("returns authenticated derived list/detail envelopes without inventing missing projects", async () => {
     const auditor = await privileged(Role.AUDITOR);
     const list = await request(app)
       .get("/api/v1/passports")
       .set("Authorization", `Bearer ${auditor.token}`);
-    expect(list.status).toBe(501);
-    expect(list.body.resource).toBe("passports");
+    expect(list.status).toBe(200);
+    expect(Array.isArray(list.body.data.passports)).toBe(true);
+    expect(list.body).toHaveProperty("meta");
     assertNoSecrets(list.body);
 
     const detail = await request(app)
       .get("/api/v1/passports/11111111-1111-4111-8111-111111111111")
       .set("Authorization", `Bearer ${auditor.token}`);
-    expect(detail.status).toBe(501);
+    expect(detail.status).toBe(404);
     assertNoSecrets(detail.body);
 
     const anonymous = await request(app).get("/api/v1/passports");
