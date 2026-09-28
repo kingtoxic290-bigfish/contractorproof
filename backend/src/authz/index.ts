@@ -23,5 +23,8 @@ export {
   assertCanWriteProject,
   assertOwnership,
   evidenceListWhere,
+  disputeListWhere,
+  correctionListWhere,
+  attestationListWhere,
 } from "../services/access.service";
 export { assertCanAttest } from "../services/attestation.service";

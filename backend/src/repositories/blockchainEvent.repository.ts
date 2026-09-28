@@ -82,6 +82,20 @@ export const blockchainEventRepository = {
 
     const existing = await prisma.blockchainEvent.findUnique({ where: { logicalKey } });
     if (existing) {
+      // A refused-closed attestation may have been removed after an EVM failure.
+      // Reuse its stable event id, but repoint the still-pending row to the retry's
+      // persisted business record so downstream readers never see a dangling reference.
+      if (!existing.txHash && input.referenceId && existing.referenceId !== input.referenceId) {
+        const updated = await prisma.blockchainEvent.update({
+          where: { id: existing.id },
+          data: {
+            referenceId: input.referenceId,
+            ...(input.evidenceHash !== undefined ? { evidenceHash: input.evidenceHash } : {}),
+            ...(input.actorId ? { actorId: input.actorId } : {}),
+          },
+        });
+        return { event: updated, created: false };
+      }
       return { event: existing, created: false };
     }
 

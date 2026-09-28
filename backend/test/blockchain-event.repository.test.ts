@@ -100,4 +100,32 @@ describe("BlockchainEvent repository idempotency", () => {
     expect(confirmed.blockNumber).toBe(12);
     expect(confirmed.evidenceHash).toBe("ef".repeat(32));
   });
+
+  it("repoints a pending logical attestation event to the persisted retry record", async () => {
+    const owner = await registerContractor("Retry Owner");
+    const { project } = await seedProjectWithPolicy(owner.contractorId);
+    const logicalKey = blockchainEventRepository.buildLogicalKey(
+      BlockchainEventType.ATTESTATION,
+      project.id,
+      "evidence:verifier",
+    );
+    const initial = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.ATTESTATION,
+      referenceId: "deleted-attestation-id",
+      logicalKey,
+      actorId: owner.userId,
+    });
+    const retry = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.ATTESTATION,
+      referenceId: "retry-attestation-id",
+      logicalKey,
+      actorId: owner.userId,
+    });
+
+    expect(retry.created).toBe(false);
+    expect(retry.event.id).toBe(initial.event.id);
+    expect(retry.event.referenceId).toBe("retry-attestation-id");
+  });
 });

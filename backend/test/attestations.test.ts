@@ -425,3 +425,36 @@ describe("POST /api/v1/attestations", () => {
     expect(evidence!.status).toBe("PENDING_VERIFICATION");
   });
 });
+
+describe("GET /api/v1/attestations", () => {
+  it("requires authentication", async () => {
+    const response = await request(app).get("/api/v1/attestations");
+    expect(response.status).toBe(401);
+  });
+
+  it("returns the standard envelope and excludes internal storage data for an authorized project reader", async () => {
+    const owner = await registerContractor("Attestation List Owner");
+    const auditor = await privileged(Role.AUDITOR);
+    const { milestone, evidenceId } = await seedEvidence(owner, "Attestation List");
+    const row = await prisma.attestation.create({
+      data: {
+        milestoneId: milestone.id,
+        evidenceId,
+        verifierId: auditor.userId,
+        verifierRole: Role.AUDITOR,
+        decision: "APPROVED",
+        comment: "reviewed",
+      },
+    });
+
+    const response = await request(app)
+      .get(`/api/v1/attestations?projectId=${(await prisma.milestone.findUnique({ where: { id: milestone.id } }))!.projectId}`)
+      .set("Authorization", `Bearer ${owner.token}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.attestations).toEqual([
+      expect.objectContaining({ id: row.id, evidenceId, milestoneId: milestone.id }),
+    ]);
+    assertSafePayload(response.body);
+  });
+});

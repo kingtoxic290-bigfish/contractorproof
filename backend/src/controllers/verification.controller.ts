@@ -4,7 +4,7 @@ import { ApiError } from "../http/errors";
 import { toHttpVerification } from "../http/evidenceMapper";
 import { readBodyField } from "../http/multipart";
 import { assertCanCreateVerification } from "../services/access.service";
-import { verificationService } from "../services/evidence";
+import { verificationApplication } from "../services/verification.application";
 import { requireUuid } from "../services/evidence/validation";
 
 function requireUser(req: Request) {
@@ -12,6 +12,27 @@ function requireUser(req: Request) {
     throw new ApiError(401, "UNAUTHENTICATED", "unauthenticated");
   }
   return req.user;
+}
+
+function toHttpProof(
+  proof: {
+    id: string;
+    eventType: string;
+    txHash: string | null;
+    blockNumber: number | null;
+    evidenceHash: string | null;
+  } | null,
+) {
+  if (!proof) {
+    return null;
+  }
+  return {
+    id: proof.id,
+    eventType: proof.eventType,
+    txHash: proof.txHash,
+    blockNumber: proof.blockNumber,
+    evidenceHash: proof.evidenceHash,
+  };
 }
 
 export async function createVerification(
@@ -35,23 +56,16 @@ export async function createVerification(
 
     await assertCanCreateVerification(actor, { evidenceId, evidenceVersionId });
 
-    const presentedBytes = req.file?.buffer;
-    const result = presentedBytes
-      ? await verificationService.compare({
-          presentedBytes,
-          evidenceId,
-          evidenceVersionId,
-          source: "INTERNAL",
-          requestedById: actor.id,
-        })
-      : await verificationService.compareStored({
-          evidenceId,
-          evidenceVersionId,
-          source: "INTERNAL",
-          requestedById: actor.id,
-        });
+    const { verification, proof } = await verificationApplication.createInternal(actor, {
+      evidenceId,
+      evidenceVersionId,
+      presentedBytes: req.file?.buffer,
+    });
 
-    sendData(res, { verification: toHttpVerification(result) });
+    sendData(res, {
+      verification: toHttpVerification(verification),
+      proof: toHttpProof(proof),
+    });
   } catch (error) {
     next(error);
   }

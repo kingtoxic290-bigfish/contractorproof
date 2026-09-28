@@ -12,6 +12,27 @@ function requireUser(req: Request) {
   return req.user;
 }
 
+function toHttpProof(
+  proof: {
+    id: string;
+    eventType: string;
+    txHash: string | null;
+    blockNumber: number | null;
+    evidenceHash: string | null;
+  } | null,
+) {
+  if (!proof) {
+    return null;
+  }
+  return {
+    id: proof.id,
+    eventType: proof.eventType,
+    txHash: proof.txHash,
+    blockNumber: proof.blockNumber,
+    evidenceHash: proof.evidenceHash,
+  };
+}
+
 export async function createAttestation(
   req: Request,
   res: Response,
@@ -34,7 +55,7 @@ export async function createAttestation(
     }
 
     // verifierId / verifierRole / evidenceVersionId from the body are ignored.
-    const row = await attestationService.create({
+    const { attestation, proof } = await attestationService.create({
       actor,
       evidenceId,
       milestoneId,
@@ -45,18 +66,46 @@ export async function createAttestation(
     sendData(
       res,
       {
-        attestation: {
-          id: row.id,
-          evidenceId: row.evidenceId,
-          milestoneId: row.milestoneId,
-          decision: row.decision,
-          verifierRole: row.verifierRole,
-          comment: row.comment,
-          createdAt: row.createdAt.toISOString(),
-        },
+        attestation,
+        proof: toHttpProof(proof),
       },
       201,
     );
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listAttestations(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestoneId =
+      typeof req.query.milestoneId === "string" ? req.query.milestoneId.trim() : undefined;
+    const projectId =
+      typeof req.query.projectId === "string" ? req.query.projectId.trim() : undefined;
+    const evidenceId =
+      typeof req.query.evidenceId === "string" ? req.query.evidenceId.trim() : undefined;
+
+    if (milestoneId) {
+      requireUuid(milestoneId, "milestoneId");
+    }
+    if (projectId) {
+      requireUuid(projectId, "projectId");
+    }
+    if (evidenceId) {
+      requireUuid(evidenceId, "evidenceId");
+    }
+
+    const attestations = await attestationService.list(actor, {
+      milestoneId,
+      projectId,
+      evidenceId,
+    });
+    sendData(res, { attestations });
   } catch (error) {
     next(error);
   }

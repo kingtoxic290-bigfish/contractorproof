@@ -168,6 +168,43 @@ export function evidenceListWhere(
   return { AND: [access, ...extra] };
 }
 
+/** SQL where-clause for GET /attestations, scoped by project access. */
+export function attestationListWhere(
+  actor: PublicUser,
+  filters: { milestoneId?: string; projectId?: string; evidenceId?: string } = {},
+): Prisma.AttestationWhereInput {
+  if (!PRIVILEGED_READ_ROLES.includes(actor.role) && actor.role !== Role.CONTRACTOR) {
+    return { id: { in: [] } };
+  }
+
+  const access: Prisma.AttestationWhereInput =
+    actor.role === Role.CONTRACTOR
+      ? {
+          milestone: {
+            project: {
+              contractor: { userId: actor.id },
+            },
+          },
+        }
+      : {};
+
+  const extra: Prisma.AttestationWhereInput[] = [];
+  if (filters.milestoneId) {
+    extra.push({ milestoneId: filters.milestoneId });
+  }
+  if (filters.projectId) {
+    extra.push({ milestone: { projectId: filters.projectId } });
+  }
+  if (filters.evidenceId) {
+    extra.push({ evidenceId: filters.evidenceId });
+  }
+
+  if (extra.length === 0) {
+    return access;
+  }
+  return { AND: [access, ...extra] };
+}
+
 /**
  * SQL where-clause for GET /disputes. Same project-access matrix as evidence list.
  * Roles with no project relationship receive an empty match.

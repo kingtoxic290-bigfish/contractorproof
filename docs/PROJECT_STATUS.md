@@ -165,8 +165,8 @@ Mounted under `/api/v1` from `backend/src/routes/index.ts`.
 | Contractors GET | COMPLETE | Scoped: owner or privileged; CLIENT/CE empty / 403 |
 | Projects / milestones | COMPLETE | POST create + scoped GET; no membership for CLIENT/CE |
 | Evidence POST/GET | COMPLETE | SHA-256 + EvidenceVersion; no get-by-id / version HTTP |
-| Verification POST | COMPLETE | MATCH / MISMATCH / PENDING / UNAVAILABLE; does not write chain |
-| Attestation POST | COMPLETE | GET `/attestations` is 501 |
+| Verification POST | COMPLETE | Internal MATCH is anchored through the application service when a writable registry is configured; other results never write |
+| Attestation POST / GET | COMPLETE | Attestation is anchored when a writable registry is configured; GET is scoped by project access |
 | Disputes POST/GET | PARTIAL | Create OPEN only; no resolve; no chain event |
 | Corrections POST/GET | PARTIAL | Requires existing `BlockchainEvent`; HTTP never creates those |
 | Variations | NOT IMPLEMENTED | GET/POST 501 |
@@ -208,7 +208,9 @@ No Passport table (ADR-0007). `BlockchainEvent` has unique `logicalKey`; confirm
 - Adapter: `backend/src/blockchain/BlockchainService.ts` (`registerProject`, `recordVerification`, `recordAttestation`) with `NonceManager` signer cache.
 - Persistence helper: `blockchainEventRepository` (pending + confirm + logical-key idempotency).
 - ABI also lists correction/dispute/resolution/variation; the service has no methods for those.
-- HTTP still does not orchestrate proof writes (TASK 2B). `CONTRACT_ADDRESS` is empty in `.env.example`.
+- Verification/attestation application services orchestrate writes through `BlockchainService` and `blockchainEventRepository`. `CONTRACT_ADDRESS` is empty in `.env.example`, so the default configuration returns no proof and keeps the off-chain workflow available.
+- Proof writes persist a pending database event before EVM submission and confirm it only after a successful receipt. PostgreSQL and the EVM cannot share an atomic transaction: failed writes leave a pending event for retry/reconciliation. Verification comparison rows remain as the truthful MATCH result even if anchoring fails; the request returns an error and no proof is claimed. Attestations are deleted after chain failure so a client retry can recreate the business row; the pending proof event remains reusable via its logical key.
+- Verification proof logical identity is `VERIFICATION:<projectId>:<evidenceVersionId>`. Attestation proof identity is `ATTESTATION:<projectId>:<evidenceId>:<verifierId>`. Only an explicit internal MATCH creates a VERIFICATION event; attestation approval creates only an ATTESTATION event.
 
 ---
 
@@ -219,22 +221,26 @@ No Passport table (ADR-0007). `BlockchainEvent` has unique `logicalKey`; confirm
 | `cd contracts && npm test` | 6/6 PASS |
 | `cd backend && npx prisma validate` | PASS |
 | `cd backend && npx tsc --noEmit` | PASS |
-| blockchain foundation vitest slice | PASS (encoding/service/event/live/e2e.blockchain) |
+| Task 2B targeted backend slice | PASS (32/32 before the final failure-case assertions; golden path rerun PASS after those assertions) |
+| `cd backend && npm test` | PASS (33 files, 209 tests) |
+| `cd contracts && npm test` | PASS (6/6) |
+| `cd backend && npx tsc --noEmit` | PASS |
+| `cd backend && npx prisma validate` | PASS (Prisma reports existing package.json configuration deprecation warning) |
 
 ---
 
 ## KNOWN ISSUES
 
-- Verification/attestation HTTP does not yet call BlockchainService (TASK 2B).
+- Blockchain proofs are optional when no writable registry is configured; API returns `proof: null` and does not claim confirmation.
 - `GET /passports` and `GET /passports/:projectId` return 501.
-- `GET /attestations`, `GET /blockchain`, GET/POST `/variations` return 501.
+- `GET /blockchain`, GET/POST `/variations` return 501.
 - Corrections require an existing `BlockchainEvent`; HTTP does not create those yet.
 - Frontend public verify page is a stub; disputes/corrections pages are placeholders.
 - Frontend register offers privileged roles; backend allows CONTRACTOR and CLIENT only.
-- Default Vitest 5s timeout can still flake first-in-file Argon2 evidence tests under parallel load.
+- Pending BlockchainEvent rows are retained after chain submission failures for safe retry and reconciliation; an operator recovery workflow is not part of this task.
 
 ---
 
 ## NEXT TASK
 
-TASK 2B — Verification and Attestation → Blockchain orchestration
+TASK 3 — Passport backend

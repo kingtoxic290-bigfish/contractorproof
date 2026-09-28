@@ -1,11 +1,12 @@
-import { AttestationDecision, Role } from "@prisma/client";
+import { AttestationDecision, Role, type Attestation, type Prisma } from "@prisma/client";
 import { evidenceRepository } from "../repositories/evidence.repository";
 import { projectRepository } from "../repositories/project.repository";
 import { contractorRepository } from "../repositories/contractor.repository";
 import { prisma } from "../repositories/prisma";
 import { ApiError } from "../http/errors";
 import { ATTEST_ROLES, type PublicUser } from "../types";
-import { assertCanReadProject } from "./access.service";
+import { assertCanReadProject, attestationListWhere } from "./access.service";
+import { proofService, type ProofView } from "./proof.service";
 
 export const ATTEST_ERROR_CODES = {
   CONTRACTOR_ATTEST_FORBIDDEN: "CONTRACTOR_ATTEST_FORBIDDEN",
@@ -57,6 +58,18 @@ export function assertCanAttest(params: {
   }
 }
 
+function toAttestationView(row: Attestation) {
+  return {
+    id: row.id,
+    evidenceId: row.evidenceId,
+    milestoneId: row.milestoneId,
+    decision: row.decision,
+    verifierRole: row.verifierRole,
+    comment: row.comment,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export const attestationService = {
   assertCanAttest,
 
@@ -66,7 +79,7 @@ export const attestationService = {
     milestoneId: string;
     decision: AttestationDecision;
     comment?: string;
-  }) {
+  }): Promise<{ attestation: ReturnType<typeof toAttestationView>; proof: ProofView | null }> {
     const evidence = await evidenceRepository.findById(input.evidenceId);
     if (!evidence) {
       throw new ApiError(404, "EVIDENCE_NOT_FOUND", "evidence not found");
@@ -74,7 +87,7 @@ export const attestationService = {
     if (evidence.milestoneId !== input.milestoneId) {
       throw new ApiError(400, "VALIDATION_ERROR", "evidence does not belong to milestone");
     }
-    if (!evidence.sha256) {
+    if (!evidence.sha256 || !evidence.currentVersionId) {
       throw new ApiError(400, "VALIDATION_ERROR", "evidence has no authoritative fingerprint");
     }
 
@@ -86,9 +99,10 @@ export const attestationService = {
     await assertCanReadProject(input.actor, milestone.projectId);
 
     const project = await projectRepository.getProjectById(milestone.projectId);
-    const contractor = project
-      ? await contractorRepository.getContractorById(project.contractorId)
-      : null;
+    if (!project) {
+      throw new ApiError(404, "PROJECT_NOT_FOUND", "project not found");
+    }
+    const contractor = await contractorRepository.getContractorById(project.contractorId);
 
     let allowedRoles: Role[] | undefined;
     if (milestone.policyId) {
@@ -105,8 +119,9 @@ export const attestationService = {
       allowedRoles,
     });
 
+    let row: Attestation;
     try {
-      return await prisma.attestation.create({
+      row = await prisma.attestation.create({
         data: {
           milestoneId: milestone.id,
           evidenceId: evidence.id,
@@ -127,5 +142,36 @@ export const attestationService = {
       }
       throw error;
     }
+
+    try {
+      const anchored = await proofService.anchorAttestation({
+        attestation: row,
+        projectId: project.id,
+        contractorId: project.contractorId,
+        milestoneId: milestone.id,
+        evidenceVersionId: evidence.currentVersionId,
+        evidenceHash: evidence.sha256,
+      });
+      return {
+        attestation: toAttestationView(row),
+        proof: anchored.attestationProof,
+      };
+    } catch (error) {
+      // Refuse-closed when the registry is writable: roll back the attestation so retries work.
+      await prisma.attestation.delete({ where: { id: row.id } }).catch(() => undefined);
+      throw error;
+    }
+  },
+
+  async list(
+    actor: PublicUser,
+    filters: { milestoneId?: string; projectId?: string; evidenceId?: string } = {},
+  ) {
+    const where = attestationListWhere(actor, filters);
+    const rows = await prisma.attestation.findMany({
+      where,
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+    return rows.map(toAttestationView);
   },
 };

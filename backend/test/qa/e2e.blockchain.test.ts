@@ -144,7 +144,7 @@ describe("blockchain integration and confirmation semantics", () => {
     }
   });
 
-  it("E2E-006 enforces BlockchainEvent logical-key uniqueness; HTTP proof orchestration remains deferred", async () => {
+  it("E2E-006 enforces BlockchainEvent logical-key uniqueness and keeps HTTP proofs unclaimed when unconfigured", async () => {
     const owner = await registerContractor("Proof Owner");
     const auditor = await privileged(Role.AUDITOR);
     const { project, milestone } = await seedProjectWithPolicy(owner.contractorId);
