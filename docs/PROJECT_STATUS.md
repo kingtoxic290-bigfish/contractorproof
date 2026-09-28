@@ -4,7 +4,30 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 6 — Variations Lifecycle
+TASK 7 — Public Verification
+
+## STATUS
+
+COMPLETE
+
+`POST /api/v1/public/verify` remains unauthenticated and accepts multipart `file` plus `evidenceId` or `evidenceVersionId`. It hashes through the canonical evidence verification service and now checks the persisted VERIFICATION BlockchainEvent. MATCH/MISMATCH require a confirmed event whose transaction hash, positive block number, and anchored hash agree with the stored EvidenceVersion. Pending/unconfirmed events return PENDING; missing or inconsistent proof returns UNAVAILABLE. The response contains only the established evidence-version reference, canonical state and meaning, and a confirmed flag with transaction hash/block number when confirmed. Unknown references remain UNAVAILABLE to limit enumeration; no project/contractor or storage details are returned.
+
+The endpoint does not authenticate callers by design; private project and evidence APIs retain their existing authentication/access controls. The public API reads persisted proof state only and does not call the EVM.
+
+TESTS:
+
+* Focused public verification, evidence HTTP, and verification-state tests — 17/17 PASS
+* Verification, attestation, Passport, dispute, correction, and variation regressions — PASS
+* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
+* Hardhat — PASS
+
+KNOWN LIMITATIONS: public verification remains file plus an existing evidence reference; hash-only lookup is intentionally unsupported. A persisted unconfirmed event is PENDING even when its receipt failed; the event model has no separate failure state.
+
+---
+
+## TASK 6 — Variations Lifecycle
 
 ## STATUS
 

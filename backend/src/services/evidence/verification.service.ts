@@ -3,6 +3,7 @@ import type { VerificationSource, VerificationStatus } from "@prisma/client";
 import { evidenceRepository } from "../../repositories/evidence.repository";
 import { evidenceVersionRepository } from "../../repositories/evidenceVersion.repository";
 import { verificationRepository } from "../../repositories/verification.repository";
+import { blockchainEventRepository } from "../../repositories/blockchainEvent.repository";
 import { normalizeSha256 } from "../../repositories/sha256";
 import type { StorageService } from "../storage/StorageService";
 import { localStorageService } from "../storage/LocalFilesystemStorageService";
@@ -17,7 +18,7 @@ import type {
 import { requireUuid } from "./validation";
 
 export const VERIFICATION_MATCH_MEANING =
-  "The submitted file matches the recorded evidence fingerprint. This does not mean the blockchain independently proves the underlying claim is true.";
+  "The submitted file matches the evidence fingerprint in a confirmed verification proof. This does not prove the underlying claim is true.";
 
 export const VERIFICATION_MISMATCH_MEANING =
   "The submitted file does not match the recorded evidence fingerprint.";
@@ -70,6 +71,8 @@ function toPublicView(result: VerificationView): PublicVerificationView {
     status: result.status,
     evidenceVersionId: result.evidenceVersionId,
     meaning: result.meaning,
+    transactionHash: null,
+    blockNumber: null,
   };
 }
 
@@ -170,7 +173,47 @@ export class VerificationService {
       source: "PUBLIC",
       requestedById: null,
     });
-    return toPublicView(result);
+    const view = toPublicView(result);
+    if (!result.evidenceVersionId || result.status === "UNAVAILABLE") {
+      return view;
+    }
+
+    let proof;
+    try {
+      proof = await blockchainEventRepository.findVerificationProofByReference(
+        result.evidenceVersionId,
+      );
+    } catch {
+      return { ...view, status: "UNAVAILABLE", meaning: meaningFor("UNAVAILABLE") };
+    }
+    if (!proof) {
+      return { ...view, status: "UNAVAILABLE", meaning: meaningFor("UNAVAILABLE") };
+    }
+    if (!proof.txHash || !proof.blockNumber || proof.blockNumber <= 0) {
+      return { ...view, status: "PENDING", meaning: meaningFor("PENDING") };
+    }
+
+    // A confirmed event is authoritative only when it anchors the stored version hash.
+    let anchoredHashMatches = false;
+    try {
+      anchoredHashMatches = Boolean(
+        result.sha256 &&
+          proof.evidenceHash &&
+          normalizeSha256(proof.evidenceHash) === normalizeSha256(result.sha256),
+      );
+    } catch {
+      // Corrupt persisted proof data is not public verification evidence.
+      return { ...view, status: "UNAVAILABLE", meaning: meaningFor("UNAVAILABLE") };
+    }
+    if (!anchoredHashMatches) {
+      return { ...view, status: "UNAVAILABLE", meaning: meaningFor("UNAVAILABLE") };
+    }
+
+    return {
+      ...view,
+      transactionHash: proof.txHash,
+      blockNumber: proof.blockNumber,
+    };
   }
 
   async listByVersion(evidenceVersionId: string): Promise<VerificationView[]> {
@@ -216,7 +259,8 @@ export class VerificationService {
         source: row.source,
         evidenceId: params.version.evidenceId,
         evidenceVersionId: params.version.id,
-        sha256: params.source === "PUBLIC" ? null : row.authoritativeSha256,
+        // This remains internal to VerificationService; toPublicView explicitly omits it.
+        sha256: row.authoritativeSha256,
         meaning: meaningFor(row.status),
         createdAt: row.createdAt.toISOString(),
       };

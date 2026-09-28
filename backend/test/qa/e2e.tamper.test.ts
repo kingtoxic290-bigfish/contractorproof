@@ -1,5 +1,5 @@
 import request from "supertest";
-import { Role } from "@prisma/client";
+import { BlockchainEventType, Role } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app";
 import { prisma } from "../../src/repositories/prisma";
@@ -25,12 +25,23 @@ describe("E2E-002 tamper detection", () => {
 
     const owner = await registerContractor("Tamper Owner");
     const auditor = await privileged(Role.AUDITOR);
-    const { milestone } = await seedProjectWithPolicy(owner.contractorId);
+    const { project, milestone } = await seedProjectWithPolicy(owner.contractorId);
 
     const upload = await uploadEvidence(owner.token, milestone.id, originalBytes, "original.txt");
     expect(upload.status).toBe(201);
     expect(upload.body.data.evidence.sha256).toBe(hashA);
     expect(upload.body.data.evidence.sha256).not.toBe(hashB);
+    await prisma.blockchainEvent.create({
+      data: {
+        projectId: project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        logicalKey: `${BlockchainEventType.VERIFICATION}:${project.id}:${upload.body.data.evidence.currentVersionId}`,
+        referenceId: upload.body.data.evidence.currentVersionId,
+        evidenceHash: hashA,
+        txHash: `0x${"ef".repeat(32)}`,
+        blockNumber: 14,
+      },
+    });
 
     const match = await request(app)
       .post("/api/v1/verification")

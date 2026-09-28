@@ -80,4 +80,6 @@ export type PublicVerificationView = {
   status: VerificationStatus;
   evidenceVersionId: string | null;
   meaning: string;
+  transactionHash: string | null;
+  blockNumber: number | null;
 };

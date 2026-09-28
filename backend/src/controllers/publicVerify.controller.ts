@@ -30,6 +30,14 @@ export async function createPublicVerification(
         status: result.status,
         evidenceVersionId: result.evidenceVersionId,
         meaning: result.meaning,
+        blockchainProof:
+          result.transactionHash && result.blockNumber
+            ? {
+                confirmed: true,
+                transactionHash: result.transactionHash,
+                blockNumber: result.blockNumber,
+              }
+            : { confirmed: false },
       },
     });
   } catch (error) {

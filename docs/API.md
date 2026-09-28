@@ -28,7 +28,8 @@ Base path: `/api/v1`. Frontend origin env: `VITE_API_ORIGIN`.
 | GET | `/api/v1/disputes` | JWT | Working |
 | POST | `/api/v1/corrections` | JWT | Working |
 | GET | `/api/v1/corrections` | JWT | Working |
-| GET | `/api/v1/public/verify` | No | Scaffold explanation |
+| GET | `/api/v1/public/verify` | No | Public verification usage and state explanation |
+| POST | `/api/v1/public/verify` | No | Public file comparison against confirmed verification proof |
 
 ## Contractors
 
@@ -469,6 +470,6 @@ The contract already supports `recordVariation`. When a writable registry is con
 
 ## Stubs (501)
 
-GET blockchain, POST public/verify.
+GET blockchain.
 
-Public POST verify will return MATCH or MISMATCH for fingerprint compare only. MATCH does not prove the construction claim.
+Public POST verify requires a confirmed `VERIFICATION` proof before returning MATCH or MISMATCH. Pending/unconfirmed proof returns PENDING; missing or inconsistent proof returns UNAVAILABLE. MATCH establishes fingerprint integrity only and does not prove the underlying construction claim.

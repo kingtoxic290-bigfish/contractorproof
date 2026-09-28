@@ -33,6 +33,10 @@ GET `/api/v1/public/verify` may keep an explanatory payload until POST exists.
 - Browser-only hashing as authority — rejected.
 - File-only global search as the only mode — deferred (enumeration risk).
 
+## Task 7 update
+
+The public endpoint now treats MATCH/MISMATCH as comparison against an anchored verification fingerprint: a persisted VERIFICATION event must have a transaction hash, positive block number, and hash matching the stored EvidenceVersion. A pending/unconfirmed event yields PENDING; an absent or inconsistent event yields UNAVAILABLE. Public output can include only the confirmed transaction hash and block number plus the existing evidence-version reference; it does not include private project or contractor records. The API continues to use the canonical backend hash implementation and reads PostgreSQL proof state without querying the chain.
+
 ## Consequences
 
 - Agent 7 implements projection + public POST; Agent 3 does not add Passport.

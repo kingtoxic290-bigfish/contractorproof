@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import request from "supertest";
-import { Role } from "@prisma/client";
+import { BlockchainEventType, Role } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
 import { prisma } from "../src/repositories/prisma";
@@ -153,6 +153,10 @@ async function cleanupUsers(): Promise<void> {
     await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
   }
 
+  await prisma.blockchainEvent.deleteMany({
+    where: { project: { contractor: { userId: { in: ids } } } },
+  });
+
   await prisma.milestone.deleteMany({
     where: { project: { contractor: { userId: { in: ids } } } },
   });
@@ -170,7 +174,7 @@ describe("Evidence and verification HTTP", () => {
 
   it("creates version 1 for an authorized contractor and ignores client-supplied internals", async () => {
     const owner = await registerContractor();
-    const { milestone } = await seedOwnedMilestone(owner.contractorId);
+    const { project, milestone } = await seedOwnedMilestone(owner.contractorId);
     const other = await registerContractor("Other Contractor");
     const bytes = Buffer.from("authorized-upload-bytes");
 
@@ -351,10 +355,21 @@ describe("Evidence and verification HTTP", () => {
 
   it("performs public MATCH/MISMATCH without private fields", async () => {
     const owner = await registerContractor();
-    const { milestone } = await seedOwnedMilestone(owner.contractorId);
+    const { project, milestone } = await seedOwnedMilestone(owner.contractorId);
     const bytes = Buffer.from("public-http-bytes");
     const created = await uploadEvidence(owner.token, milestone.id, "public.png", bytes);
     const versionId = created.body.data.evidence.currentVersionId as string;
+    await prisma.blockchainEvent.create({
+      data: {
+        projectId: project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        logicalKey: `${BlockchainEventType.VERIFICATION}:${project.id}:${versionId}`,
+        referenceId: versionId,
+        evidenceHash: created.body.data.evidence.sha256,
+        txHash: `0x${"ef".repeat(32)}`,
+        blockNumber: 7,
+      },
+    });
 
     const match = await request(app)
       .post("/api/v1/public/verify")
@@ -364,7 +379,7 @@ describe("Evidence and verification HTTP", () => {
       .attach("file", bytes, "public.png");
     expect(match.status).toBe(200);
     expect(match.body.data.verification.status).toBe("MATCH");
-    expect(match.body.data.verification.meaning).toMatch(/does not mean/i);
+    expect(match.body.data.verification.meaning).toMatch(/does not prove/i);
     expect(match.body.data.verification).not.toHaveProperty("sha256");
     expect(match.body.data.verification).not.toHaveProperty("requestedById");
     assertNoLeakage(match.body, [owner.email]);

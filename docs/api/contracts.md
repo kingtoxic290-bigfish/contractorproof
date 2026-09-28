@@ -297,7 +297,7 @@ Grandfathered scaffold JSON explaining MATCH.
 
 Auth: none  
 multipart: `file` + `evidenceVersionId` or `evidenceId`  
-Calls `verificationService.comparePublic`. No hash-only lookup.
+Calls the canonical `verificationService.comparePublic` hash path and requires a matching, confirmed `VERIFICATION` BlockchainEvent before returning MATCH or MISMATCH. A pending/unconfirmed event returns PENDING; an unknown reference, missing event, or inconsistent event hash returns UNAVAILABLE. Confirmation requires a transaction hash and positive block number. No hash-only lookup.
 
 ```json
 {
@@ -305,14 +305,19 @@ Calls `verificationService.comparePublic`. No hash-only lookup.
     "verification": {
       "status": "MATCH",
       "evidenceVersionId": "uuid",
-      "meaning": "The submitted file matches the recorded evidence fingerprint. This does not mean the blockchain independently proves the underlying claim is true."
+      "meaning": "The submitted file matches the recorded fingerprint anchored by a confirmed verification proof.",
+      "blockchainProof": {
+        "confirmed": true,
+        "transactionHash": "0x...",
+        "blockNumber": 123
+      }
     }
   },
   "meta": {}
 }
 ```
 
-Never returned: storage keys/paths, emails, requester identity, private comments, authorization data, secrets, stack traces.  
+When proof is pending/unavailable, `blockchainProof` is `{ "confirmed": false }` and transaction details are omitted. Never returned: storage keys/paths, emails, requester identity, private comments, authorization data, secrets, stack traces, project/contractor records. Unknown references return UNAVAILABLE rather than revealing record existence.
 Do not add `GET /public/evidence/:id` or `GET /public/hash/:hash`.
 
 ---

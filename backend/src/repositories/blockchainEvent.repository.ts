@@ -62,6 +62,23 @@ export const blockchainEventRepository = {
     return prisma.blockchainEvent.findUnique({ where: { logicalKey } });
   },
 
+  findVerificationProofByReference(referenceId: string) {
+    return prisma.blockchainEvent.findFirst({
+      where: {
+        eventType: BlockchainEventType.VERIFICATION,
+        referenceId,
+        project: {
+          milestones: {
+            some: {
+              evidence: { some: { versions: { some: { id: referenceId } } } },
+            },
+          },
+        },
+      },
+      select: { txHash: true, blockNumber: true, evidenceHash: true },
+    });
+  },
+
   listByProject(projectId: string): Promise<BlockchainEvent[]> {
     return prisma.blockchainEvent.findMany({
       where: { projectId },

@@ -1,9 +1,10 @@
 import { readFileSync } from "fs";
 import path from "path";
 import request from "supertest";
-import { Role } from "@prisma/client";
+import { BlockchainEventType, Role } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { app } from "../../src/app";
+import { prisma } from "../../src/repositories/prisma";
 import {
   assertNoSecrets,
   cleanupQaUsers,
@@ -38,18 +39,30 @@ describe("passport and public verification", () => {
 
   it("public verification accepts only approved fields and rejects malformed or unknown proofs", async () => {
     const owner = await registerContractor();
-    const { milestone } = await seedProjectWithPolicy(owner.contractorId);
+    const { project, milestone } = await seedProjectWithPolicy(owner.contractorId);
     const bytes = Buffer.from("public-passport-bytes");
     const upload = await uploadEvidence(owner.token, milestone.id, bytes, "public.txt");
+    const versionId = upload.body.data.evidence.currentVersionId as string;
+    await prisma.blockchainEvent.create({
+      data: {
+        projectId: project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        logicalKey: `${BlockchainEventType.VERIFICATION}:${project.id}:${versionId}`,
+        referenceId: versionId,
+        evidenceHash: upload.body.data.evidence.sha256,
+        txHash: `0x${"cd".repeat(32)}`,
+        blockNumber: 12,
+      },
+    });
 
     const match = await request(app)
       .post("/api/v1/public/verify")
-      .field("evidenceVersionId", upload.body.data.evidence.currentVersionId)
+      .field("evidenceVersionId", versionId)
       .attach("file", bytes, "public.txt");
     expect(match.status).toBe(200);
     expect(match.body.data.verification.status).toBe("MATCH");
     expect(Object.keys(match.body.data.verification).sort()).toEqual(
-      ["evidenceVersionId", "meaning", "status"].sort(),
+      ["blockchainProof", "evidenceVersionId", "meaning", "status"].sort(),
     );
     assertNoSecrets(match.body, [owner.email]);
 
@@ -73,7 +86,8 @@ describe("passport and public verification", () => {
 
     const scaffold = await request(app).get("/api/v1/public/verify");
     expect(scaffold.status).toBe(200);
-    expect(scaffold.body.matchMeaning).toMatch(/does not mean/i);
+    expect(scaffold.body.data.matchMeaning).toMatch(/does not prove/i);
+    expect(scaffold.body).toHaveProperty("meta");
     assertNoSecrets(scaffold.body);
   });
 

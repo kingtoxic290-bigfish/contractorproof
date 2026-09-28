@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from "fs/promises";
 import os from "os";
 import path from "path";
 import { randomUUID } from "crypto";
-import { Role } from "@prisma/client";
+import { BlockchainEventType, Role } from "@prisma/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { prisma } from "../src/repositories/prisma";
 import { sha256Buffer } from "../src/utils/hash";
@@ -58,6 +58,9 @@ async function cleanupUser(userId: string) {
     await prisma.evidenceVersion.deleteMany({ where: { evidenceId: { in: evidenceIds } } });
     await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
   }
+  await prisma.blockchainEvent.deleteMany({
+    where: { project: { contractor: { userId } } },
+  });
   const milestoneIds =
     user.contractor?.projects.flatMap((project) => project.milestones.map((row) => row.id)) ?? [];
   if (milestoneIds.length > 0) {
@@ -238,7 +241,7 @@ describe("EvidenceService and VerificationService", () => {
   });
 
   it("returns a public view without storage paths or requester identity", async () => {
-    const { user, milestone } = await setup();
+    const { user, project, milestone } = await setup();
     userId = user.id;
     const created = await evidenceService.create({
       milestoneId: milestone.id,
@@ -246,6 +249,20 @@ describe("EvidenceService and VerificationService", () => {
       originalName: "public.png",
       mimeType: "image/png",
       buffer: Buffer.from("public-bytes"),
+    });
+    const version = await prisma.evidenceVersion.findUnique({
+      where: { id: created.currentVersionId! },
+    });
+    await prisma.blockchainEvent.create({
+      data: {
+        projectId: project.id,
+        eventType: BlockchainEventType.VERIFICATION,
+        logicalKey: `${BlockchainEventType.VERIFICATION}:${project.id}:${created.currentVersionId}`,
+        referenceId: created.currentVersionId,
+        evidenceHash: version!.sha256,
+        txHash: `0x${"ab".repeat(32)}`,
+        blockNumber: 2,
+      },
     });
 
     const publicResult = await verificationService.comparePublic({

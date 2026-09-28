@@ -280,7 +280,7 @@ describe("E2E-001 golden ContractorProof lifecycle (implemented slice)", () => {
       .attach("file", originalBytes, "original.txt");
     expect(publicVerify.status).toBe(200);
     expect(publicVerify.body.data.verification.status).toBe("MATCH");
-    expect(publicVerify.body.data.verification.meaning).toMatch(/does not mean/i);
+    expect(publicVerify.body.data.verification.meaning).toMatch(/does not prove/i);
     expect(publicVerify.body.data.verification).not.toHaveProperty("sha256");
     expect(publicVerify.body.data.verification).not.toHaveProperty("requestedById");
     expect(publicVerify.body.data.verification).not.toHaveProperty("email");
