@@ -1,4 +1,4 @@
-import { Contract, Interface, JsonRpcProvider, Wallet, type TransactionReceipt } from "ethers";
+import { Contract, Interface, JsonRpcProvider, NonceManager, Wallet, type TransactionReceipt } from "ethers";
 import { env } from "../config/env";
 import { RepositoryError } from "../repositories/errors";
 import { applicationIdToBytes32, sha256HexToBytes32 } from "./encoding";
@@ -32,8 +32,32 @@ type BlockchainConfig = {
 
 const ZERO = "0x" + "00".repeat(32);
 
+function revertMessage(error: unknown): string {
+  if (!error || typeof error !== "object") {
+    return error instanceof Error ? error.message : "blockchain transaction failed";
+  }
+  const record = error as {
+    message?: string;
+    shortMessage?: string;
+    reason?: string;
+    code?: string;
+    info?: { error?: { message?: string } };
+    data?: { message?: string };
+  };
+  return [
+    record.code,
+    record.reason,
+    record.shortMessage,
+    record.message,
+    record.info?.error?.message,
+    record.data?.message,
+  ]
+    .filter((part): part is string => typeof part === "string" && part.length > 0)
+    .join(" | ");
+}
+
 function mapRevert(error: unknown): never {
-  const message = error instanceof Error ? error.message : "blockchain transaction failed";
+  const message = revertMessage(error);
   if (/event already recorded/i.test(message)) {
     throw new BlockchainError(BLOCKCHAIN_ERROR_CODES.DUPLICATE_PROOF, "proof event already recorded");
   }
@@ -47,6 +71,8 @@ export class BlockchainService {
   private readonly provider: JsonRpcProvider;
   private readonly config: BlockchainConfig;
   private readonly iface = new Interface(REGISTRY_ABI);
+  /** Cached NonceManager so sequential writes on one service stay ordered. */
+  private signer: NonceManager | null = null;
 
   constructor(
     config: Partial<BlockchainConfig> = {},
@@ -60,6 +86,7 @@ export class BlockchainService {
       confirmations: config.confirmations ?? env.blockchainConfirmations,
       nodeEnv: config.nodeEnv ?? env.nodeEnv,
     };
+    // Do not pin a static network: assertReadyForWrites must observe the real chain id.
     this.provider = provider ?? new JsonRpcProvider(this.config.rpcUrl);
   }
 
@@ -84,8 +111,10 @@ export class BlockchainService {
         "blockchain signer is not configured",
       );
     }
-    const signer = new Wallet(this.config.privateKey, this.provider);
-    return new Contract(this.config.contractAddress, REGISTRY_ABI, signer);
+    if (!this.signer) {
+      this.signer = new NonceManager(new Wallet(this.config.privateKey, this.provider));
+    }
+    return new Contract(this.config.contractAddress, REGISTRY_ABI, this.signer);
   }
 
   async eventExists(eventId: string): Promise<boolean> {

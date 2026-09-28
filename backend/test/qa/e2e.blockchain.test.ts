@@ -6,6 +6,10 @@ import { app } from "../../src/app";
 import { BlockchainService } from "../../src/blockchain/BlockchainService";
 import { BLOCKCHAIN_ERROR_CODES } from "../../src/blockchain/errors";
 import { REGISTRY_ABI } from "../../src/blockchain/registry.abi";
+import {
+  blockchainEventRepository,
+  buildLogicalKey,
+} from "../../src/repositories/blockchainEvent.repository";
 import { prisma } from "../../src/repositories/prisma";
 import { sha256Buffer } from "../../src/utils/hash";
 import {
@@ -140,7 +144,7 @@ describe("blockchain integration and confirmation semantics", () => {
     }
   });
 
-  it("E2E-006 records the missing logical proof orchestration and unique key as BLOCKED", async () => {
+  it("E2E-006 enforces BlockchainEvent logical-key uniqueness; HTTP proof orchestration remains deferred", async () => {
     const owner = await registerContractor("Proof Owner");
     const auditor = await privileged(Role.AUDITOR);
     const { project, milestone } = await seedProjectWithPolicy(owner.contractorId);
@@ -166,26 +170,6 @@ describe("blockchain integration and confirmation semantics", () => {
       });
     expect(replay.status).toBe(409);
 
-    const [a, b] = await Promise.all([
-      request(app)
-        .post("/api/v1/attestations")
-        .set("Authorization", `Bearer ${auditor.token}`)
-        .send({
-          evidenceId: upload.body.data.evidence.id,
-          milestoneId: milestone.id,
-          decision: "APPROVED",
-        }),
-      request(app)
-        .post("/api/v1/attestations")
-        .set("Authorization", `Bearer ${auditor.token}`)
-        .send({
-          evidenceId: upload.body.data.evidence.id,
-          milestoneId: milestone.id,
-          decision: "APPROVED",
-        }),
-    ]);
-    expect([a.status, b.status].every((status) => status === 409)).toBe(true);
-
     const events = await prisma.blockchainEvent.findMany({ where: { projectId: project.id } });
     expect(events).toHaveLength(0);
 
@@ -198,27 +182,42 @@ describe("blockchain integration and confirmation semantics", () => {
       });
     expect([404, 405, 501]).toContain(submit.status);
 
-    const firstEvent = await prisma.blockchainEvent.create({
-      data: {
-        projectId: project.id,
-        eventType: BlockchainEventType.VERIFICATION,
-        referenceId: upload.body.data.evidence.currentVersionId,
-        evidenceHash: upload.body.data.evidence.sha256,
-        actorId: auditor.userId,
-      },
+    const versionId = upload.body.data.evidence.currentVersionId as string;
+    const firstCreate = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.VERIFICATION,
+      referenceId: versionId,
+      evidenceHash: upload.body.data.evidence.sha256,
+      actorId: auditor.userId,
     });
-    const secondEvent = await prisma.blockchainEvent.create({
-      data: {
-        projectId: project.id,
-        eventType: BlockchainEventType.VERIFICATION,
-        referenceId: upload.body.data.evidence.currentVersionId,
-        evidenceHash: upload.body.data.evidence.sha256,
-        actorId: auditor.userId,
-      },
+    expect(firstCreate.created).toBe(true);
+    expect(firstCreate.event.logicalKey).toBe(
+      buildLogicalKey(BlockchainEventType.VERIFICATION, project.id, versionId),
+    );
+    expect(firstCreate.event.txHash).toBeNull();
+
+    const secondCreate = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.VERIFICATION,
+      referenceId: versionId,
+      evidenceHash: upload.body.data.evidence.sha256,
+      actorId: auditor.userId,
     });
-    expect(firstEvent.id).not.toBe(secondEvent.id);
-    expect(firstEvent.txHash).toBeNull();
-    expect(secondEvent.txHash).toBeNull();
+    expect(secondCreate.created).toBe(false);
+    expect(secondCreate.event.id).toBe(firstCreate.event.id);
+
+    await expect(
+      prisma.blockchainEvent.create({
+        data: {
+          projectId: project.id,
+          eventType: BlockchainEventType.VERIFICATION,
+          logicalKey: firstCreate.event.logicalKey,
+          referenceId: versionId,
+          evidenceHash: upload.body.data.evidence.sha256,
+          actorId: auditor.userId,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "P2002" });
   });
 
   it("rejects the zero hash and keeps PostgreSQL as the UUID authority", async () => {

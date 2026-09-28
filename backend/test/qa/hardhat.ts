@@ -21,53 +21,93 @@ const CONTRACTS_ROOT = path.resolve(__dirname, "../../../contracts");
 
 let startedByQa: ChildProcess | undefined;
 
-export async function isLocalHardhatAvailable(): Promise<boolean> {
+async function rpcChainId(): Promise<number | null> {
   try {
-    const provider = new JsonRpcProvider(HARDHAT_RPC_URL);
-    const network = await Promise.race([
-      provider.getNetwork(),
-      new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("rpc timeout")), 2_000);
+    const response = await fetch(HARDHAT_RPC_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_chainId",
+        params: [],
       }),
-    ]);
-    return Number(network.chainId) === HARDHAT_CHAIN_ID;
+      signal: AbortSignal.timeout(2_000),
+    });
+    const json = (await response.json()) as { result?: string };
+    if (!json.result) {
+      return null;
+    }
+    return Number.parseInt(json.result, 16);
   } catch {
-    return false;
+    return null;
   }
 }
 
+export async function isLocalHardhatAvailable(): Promise<boolean> {
+  const chainId = await rpcChainId();
+  return chainId === HARDHAT_CHAIN_ID;
+}
+
+/**
+ * Ensure a local Hardhat JSON-RPC node is reachable on HARDHAT_RPC_URL.
+ * Starts `npx hardhat node` when nothing answers; if the port is already
+ * occupied by Hardhat, reuses it. Does not require a manual RPC start.
+ */
 export async function ensureLocalHardhat(): Promise<boolean> {
   if (await isLocalHardhatAvailable()) {
     return true;
+  }
+
+  if (startedByQa) {
+    for (let i = 0; i < 25; i += 1) {
+      if (await isLocalHardhatAvailable()) {
+        return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   }
 
   startedByQa = spawn("npx", ["hardhat", "node"], {
     cwd: CONTRACTS_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env },
+    detached: true,
   });
 
+  let sawAddrInUse = false;
   const ready = await new Promise<boolean>((resolve) => {
-    const timer = setTimeout(() => resolve(false), 20_000);
+    const timer = setTimeout(() => resolve(false), 25_000);
     const onData = (chunk: Buffer) => {
-      if (chunk.toString().includes("Started HTTP")) {
+      const text = chunk.toString();
+      if (text.includes("Started HTTP")) {
         clearTimeout(timer);
         resolve(true);
+      }
+      if (/EADDRINUSE|address already in use/i.test(text)) {
+        sawAddrInUse = true;
       }
     };
     startedByQa?.stdout?.on("data", onData);
     startedByQa?.stderr?.on("data", onData);
     startedByQa?.on("exit", () => {
       clearTimeout(timer);
+      // Port may already host a healthy Hardhat we did not start.
       resolve(false);
     });
   });
 
   if (!ready) {
-    stopQaHardhat();
+    const child = startedByQa;
+    startedByQa = undefined;
+    child?.kill("SIGTERM");
+    if (sawAddrInUse || (await isLocalHardhatAvailable())) {
+      return isLocalHardhatAvailable();
+    }
     return false;
   }
-  for (let i = 0; i < 10; i += 1) {
+
+  for (let i = 0; i < 25; i += 1) {
     if (await isLocalHardhatAvailable()) {
       return true;
     }
@@ -81,8 +121,20 @@ export function stopQaHardhat(): void {
   if (!startedByQa) {
     return;
   }
-  startedByQa.kill("SIGTERM");
+  const child = startedByQa;
   startedByQa = undefined;
+  try {
+    if (child.pid) {
+      // Kill the whole process group when possible (npx → hardhat node).
+      process.kill(-child.pid, "SIGKILL");
+    }
+  } catch {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // already exited
+    }
+  }
 }
 
 export async function deployContractorProofRegistry() {
@@ -96,6 +148,8 @@ export async function deployContractorProofRegistry() {
     throw new Error(`expected Hardhat chain ${HARDHAT_CHAIN_ID}, got ${network.chainId}`);
   }
   const wallet = new Wallet(HARDHAT_TEST_PRIVATE_KEY, provider);
+  // Sync nonce from chain in case prior tests already used account #0.
+  await wallet.getNonce("pending");
   const factory = new ContractFactory(artifact.abi, artifact.bytecode, wallet);
   const contract = await factory.deploy();
   await contract.waitForDeployment();

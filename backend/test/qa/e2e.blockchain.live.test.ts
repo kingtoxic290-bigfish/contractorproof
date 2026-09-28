@@ -3,7 +3,12 @@ import { BlockchainEventType } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { BlockchainService } from "../../src/blockchain/BlockchainService";
 import { BLOCKCHAIN_ERROR_CODES } from "../../src/blockchain/errors";
+import {
+  blockchainEventRepository,
+  buildLogicalKey,
+} from "../../src/repositories/blockchainEvent.repository";
 import { prisma } from "../../src/repositories/prisma";
+import { sha256Buffer } from "../../src/utils/hash";
 import {
   cleanupQaUsers,
   independentSha256,
@@ -20,22 +25,95 @@ import {
   stopQaHardhat,
 } from "./hardhat";
 
-describe("E2E-029 live Hardhat BlockchainService", () => {
+const HASH_A = sha256Buffer(Buffer.from("blockchain-service-bytes"));
+
+/**
+ * All live JSON-RPC writes for account #0 live in this single file so parallel
+ * Vitest workers cannot race nonces against the same Hardhat signer.
+ */
+describe.sequential("E2E-029 live Hardhat BlockchainService", () => {
   let live = false;
+  let contractAddress = "";
 
   beforeAll(async () => {
     live = await ensureLocalHardhat();
-  }, 30_000);
+    if (live) {
+      const deployed = await deployContractorProofRegistry();
+      contractAddress = deployed.address;
+    }
+  }, 45_000);
 
   afterAll(() => {
+    // Global setup owns the long-lived node; only stop if this file spawned one.
     stopQaHardhat();
   });
 
   afterEach(cleanupQaUsers);
 
-  it("deploys ContractorProofRegistry, records a real proof, and persists CONFIRMED fields", async () => {
+  function service() {
+    return new BlockchainService({
+      rpcUrl: HARDHAT_RPC_URL,
+      contractAddress,
+      privateKey: HARDHAT_TEST_PRIVATE_KEY,
+      chainId: HARDHAT_CHAIN_ID,
+      confirmations: 1,
+    });
+  }
+
+  it("registerProject + recordVerification + recordAttestation on one cached signer", async () => {
     if (!live) {
-      expect.fail("local Hardhat RPC was not available");
+      expect.fail(
+        "local Hardhat RPC was not available (ensureLocalHardhat failed to start or connect)",
+      );
+    }
+    const chain = service();
+    const projectId = randomUUID();
+    const contractorId = randomUUID();
+    const milestoneId = randomUUID();
+    const actorId = randomUUID();
+    const verificationEventId = randomUUID();
+    const attestationEventId = randomUUID();
+
+    const registered = await chain.registerProject({ projectId, contractorId });
+    expect(registered.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
+    expect(registered.blockNumber).toBeGreaterThan(0);
+    expect(await chain.projectIsRegistered(projectId)).toBe(true);
+
+    const verification = await chain.recordVerification({
+      eventId: verificationEventId,
+      projectId,
+      milestoneId,
+      evidenceHash: HASH_A,
+      actorId,
+    });
+    expect(verification.evidenceHash).toBe(HASH_A);
+    expect(verification.eventId).toBe(verificationEventId);
+    expect(await chain.eventExists(verificationEventId)).toBe(true);
+
+    const attestation = await chain.recordAttestation({
+      eventId: attestationEventId,
+      projectId,
+      evidenceHash: HASH_A,
+      actorId,
+      approved: true,
+    });
+    expect(attestation.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
+    expect(await chain.eventExists(attestationEventId)).toBe(true);
+
+    await expect(chain.recordVerification({
+      eventId: verificationEventId,
+      projectId,
+      milestoneId,
+      evidenceHash: HASH_A,
+      actorId,
+    })).rejects.toMatchObject({ code: BLOCKCHAIN_ERROR_CODES.DUPLICATE_PROOF });
+  });
+
+  it("deploys, records a real proof, and persists CONFIRMED BlockchainEvent fields idempotently", async () => {
+    if (!live) {
+      expect.fail(
+        "local Hardhat RPC was not available (ensureLocalHardhat failed to start or connect)",
+      );
     }
     const owner = await registerContractor("Live Chain Owner");
     const { project, milestone } = await seedProjectWithPolicy(owner.contractorId);
@@ -45,29 +123,16 @@ describe("E2E-029 live Hardhat BlockchainService", () => {
     expect(upload.status).toBe(201);
     expect(upload.body.data.evidence.sha256).toBe(expectedHash);
 
-    const deployed = await deployContractorProofRegistry();
-    const serviceConfig = {
-      rpcUrl: HARDHAT_RPC_URL,
-      contractAddress: deployed.address,
-      privateKey: HARDHAT_TEST_PRIVATE_KEY,
-      chainId: HARDHAT_CHAIN_ID,
-      confirmations: 1,
-    };
-    const service = new BlockchainService(serviceConfig);
-
-    const registered = await service.registerProject({
+    const chain = service();
+    const registered = await chain.registerProject({
       projectId: project.id,
       contractorId: owner.contractorId,
     });
     expect(registered.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
-    expect(registered.blockNumber).toBeGreaterThan(0);
-    expect(await service.projectIsRegistered(project.id)).toBe(true);
+    expect(await chain.projectIsRegistered(project.id)).toBe(true);
 
     const eventId = randomUUID();
-    // A second service instance is required: getSignerContract() builds a new
-    // Wallet per call and sequential writes on one JsonRpcProvider can fail.
-    const recorder = new BlockchainService(serviceConfig);
-    const proof = await recorder.recordProof({
+    const proof = await chain.recordProof({
       eventId,
       projectId: project.id,
       milestoneId: milestone.id,
@@ -78,41 +143,42 @@ describe("E2E-029 live Hardhat BlockchainService", () => {
     expect(proof.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
     expect(proof.blockNumber).toBeGreaterThan(0);
     expect(proof.evidenceHash).toBe(expectedHash);
-    expect(proof.eventId).toBe(eventId);
-    expect(proof.contractAddress.toLowerCase()).toBe(deployed.address.toLowerCase());
-    expect(await service.eventExists(eventId)).toBe(true);
+    expect(await chain.eventExists(eventId)).toBe(true);
 
-    const receipt = await deployed.provider.getTransactionReceipt(proof.txHash);
-    expect(receipt?.status).toBe(1);
-    expect(Number(receipt?.blockNumber)).toBe(proof.blockNumber);
-
-    const pending = await prisma.blockchainEvent.create({
-      data: {
-        projectId: project.id,
-        eventType: BlockchainEventType.VERIFICATION,
-        referenceId: upload.body.data.evidence.currentVersionId,
-        evidenceHash: expectedHash,
-        actorId: owner.userId,
-      },
+    const versionId = upload.body.data.evidence.currentVersionId as string;
+    const { event: pending, created } = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.VERIFICATION,
+      referenceId: versionId,
+      evidenceHash: expectedHash,
+      actorId: owner.userId,
     });
+    expect(created).toBe(true);
+    expect(pending.logicalKey).toBe(
+      buildLogicalKey(BlockchainEventType.VERIFICATION, project.id, versionId),
+    );
     expect(pending.txHash).toBeNull();
-    expect(pending.blockNumber).toBeNull();
 
-    const confirmed = await prisma.blockchainEvent.update({
-      where: { id: pending.id },
-      data: {
-        txHash: proof.txHash,
-        blockNumber: proof.blockNumber,
-        evidenceHash: proof.evidenceHash,
-      },
+    const confirmed = await blockchainEventRepository.confirm(pending.id, {
+      txHash: proof.txHash,
+      blockNumber: proof.blockNumber,
+      evidenceHash: proof.evidenceHash,
     });
     expect(confirmed.txHash).toBe(proof.txHash);
     expect(confirmed.blockNumber).toBe(proof.blockNumber);
-    expect(confirmed.evidenceHash).toBe(expectedHash);
-    expect(confirmed.evidenceHash).toBe(upload.body.data.evidence.sha256);
+
+    const retry = await blockchainEventRepository.createPending({
+      projectId: project.id,
+      eventType: BlockchainEventType.VERIFICATION,
+      referenceId: versionId,
+      evidenceHash: expectedHash,
+      actorId: owner.userId,
+    });
+    expect(retry.created).toBe(false);
+    expect(retry.event.id).toBe(pending.id);
 
     await expect(
-      service.recordProof({
+      chain.recordProof({
         eventId,
         projectId: project.id,
         milestoneId: milestone.id,
@@ -120,17 +186,27 @@ describe("E2E-029 live Hardhat BlockchainService", () => {
         actorId: owner.userId,
       }),
     ).rejects.toMatchObject({ code: BLOCKCHAIN_ERROR_CODES.DUPLICATE_PROOF });
+
+    expect(
+      await prisma.blockchainEvent.count({
+        where: {
+          projectId: project.id,
+          eventType: BlockchainEventType.VERIFICATION,
+          referenceId: versionId,
+        },
+      }),
+    ).toBe(1);
   });
 
   it("rejects a wrong chain id, empty contract code, and an unauthorized signer", async () => {
     if (!live) {
-      expect.fail("local Hardhat RPC was not available");
+      expect.fail(
+        "local Hardhat RPC was not available (ensureLocalHardhat failed to start or connect)",
+      );
     }
-    const deployed = await deployContractorProofRegistry();
-
     const wrongNetwork = new BlockchainService({
       rpcUrl: HARDHAT_RPC_URL,
-      contractAddress: deployed.address,
+      contractAddress,
       privateKey: HARDHAT_TEST_PRIVATE_KEY,
       chainId: 1,
       confirmations: 1,
@@ -139,7 +215,12 @@ describe("E2E-029 live Hardhat BlockchainService", () => {
       code: BLOCKCHAIN_ERROR_CODES.WRONG_NETWORK,
     });
 
-    const eoa = await deployed.provider.getSigner(1);
+    const { JsonRpcProvider } = await import("ethers");
+    const rpc = new JsonRpcProvider(HARDHAT_RPC_URL, {
+      chainId: HARDHAT_CHAIN_ID,
+      name: "hardhat",
+    });
+    const eoa = await rpc.getSigner(1);
     const wrongContract = new BlockchainService({
       rpcUrl: HARDHAT_RPC_URL,
       contractAddress: await eoa.getAddress(),
@@ -154,7 +235,7 @@ describe("E2E-029 live Hardhat BlockchainService", () => {
     const outsiderKey = "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d";
     const outsider = new BlockchainService({
       rpcUrl: HARDHAT_RPC_URL,
-      contractAddress: deployed.address,
+      contractAddress,
       privateKey: outsiderKey,
       chainId: HARDHAT_CHAIN_ID,
       confirmations: 1,

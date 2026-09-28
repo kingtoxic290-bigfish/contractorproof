@@ -102,6 +102,7 @@ async function seedMilestone(owner: Account & { contractorId: string }, label: s
     data: {
       projectId: project.id,
       eventType: BlockchainEventType.ATTESTATION,
+      logicalKey: `${BlockchainEventType.ATTESTATION}:${project.id}:${project.id}`,
     },
   });
   createdEventIds.push(originalEvent.id);

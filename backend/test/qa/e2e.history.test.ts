@@ -97,6 +97,8 @@ describe("evidence versions, disputes, corrections, and variations", () => {
       data: {
         projectId: project.id,
         eventType: BlockchainEventType.VERIFICATION,
+        logicalKey: `${BlockchainEventType.VERIFICATION}:${project.id}:${upload.body.data.evidence.currentVersionId}`,
+        referenceId: upload.body.data.evidence.currentVersionId,
         evidenceHash: upload.body.data.evidence.sha256,
         actorId: owner.userId,
       },
