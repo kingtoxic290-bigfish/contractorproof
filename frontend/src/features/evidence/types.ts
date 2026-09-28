@@ -1,4 +1,4 @@
-import { asNullableString, asRequiredString, isPlainRecord } from "../shared/query";
+import { asRequiredString, isPlainRecord } from "../shared/query";
 
 export type PublicEvidenceVersion = {
   id: string;
@@ -11,6 +11,9 @@ export type PublicEvidenceVersion = {
   createdAt: string;
 };
 
+export type PersistedVerificationStatus = "MATCH" | "MISMATCH" | "PENDING" | "UNAVAILABLE";
+export type EvidenceWorkflowStatus = "PENDING_VERIFICATION" | "VERIFIED" | "REJECTED";
+
 export type PublicEvidence = {
   id: string;
   milestoneId: string;
@@ -19,15 +22,31 @@ export type PublicEvidence = {
   sha256: string;
   mimeType: string;
   sizeBytes: number;
-  status: string;
-  verificationStatus: string;
+  status: EvidenceWorkflowStatus;
+  verificationStatus: PersistedVerificationStatus;
   currentVersion: PublicEvidenceVersion | null;
   createdAt: string;
   updatedAt: string;
 };
 
 function asRequiredNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function asTimestamp(value: unknown): string | null {
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function isSha256(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+}
+
+function isVerificationStatus(value: unknown): value is PersistedVerificationStatus {
+  return value === "MATCH" || value === "MISMATCH" || value === "PENDING" || value === "UNAVAILABLE";
+}
+
+function isEvidenceWorkflowStatus(value: unknown): value is EvidenceWorkflowStatus {
+  return value === "PENDING_VERIFICATION" || value === "VERIFIED" || value === "REJECTED";
 }
 
 export function parsePublicEvidenceVersion(value: unknown): PublicEvidenceVersion | null {
@@ -37,21 +56,22 @@ export function parsePublicEvidenceVersion(value: unknown): PublicEvidenceVersio
 
   const id = asRequiredString(value.id);
   const evidenceId = asRequiredString(value.evidenceId);
-  const sha256 = asRequiredString(value.sha256);
+  const sha256 = value.sha256;
   const fileName = asRequiredString(value.fileName);
   const mimeType = asRequiredString(value.mimeType);
-  const createdAt = asRequiredString(value.createdAt);
+  const createdAt = asTimestamp(value.createdAt);
   const versionNumber = asRequiredNumber(value.versionNumber);
   const sizeBytes = asRequiredNumber(value.sizeBytes);
   if (
     !id ||
     !evidenceId ||
-    !sha256 ||
+    !isSha256(sha256) ||
     !fileName ||
     !mimeType ||
     !createdAt ||
     versionNumber === null ||
-    sizeBytes === null
+    sizeBytes === null ||
+    versionNumber < 1
   ) {
     return null;
   }
@@ -72,28 +92,36 @@ export function parsePublicEvidence(value: unknown): PublicEvidence | null {
   if (!isPlainRecord(value)) {
     return null;
   }
+  if (!("currentVersion" in value)) {
+    return null;
+  }
 
   const id = asRequiredString(value.id);
   const milestoneId = asRequiredString(value.milestoneId);
   const fileName = asRequiredString(value.fileName);
-  const sha256 = asRequiredString(value.sha256);
+  const sha256 = value.sha256;
   const mimeType = asRequiredString(value.mimeType);
-  const status = asRequiredString(value.status);
-  const verificationStatus = asRequiredString(value.verificationStatus);
-  const createdAt = asRequiredString(value.createdAt);
-  const updatedAt = asRequiredString(value.updatedAt);
+  const status = value.status;
+  const verificationStatus = value.verificationStatus;
+  const createdAt = asTimestamp(value.createdAt);
+  const updatedAt = asTimestamp(value.updatedAt);
   const sizeBytes = asRequiredNumber(value.sizeBytes);
+  const currentVersionId =
+    value.currentVersionId === null || typeof value.currentVersionId === "string"
+      ? value.currentVersionId
+      : undefined;
   if (
     !id ||
     !milestoneId ||
     !fileName ||
-    !sha256 ||
+    !isSha256(sha256) ||
     !mimeType ||
-    !status ||
-    !verificationStatus ||
+    !isEvidenceWorkflowStatus(status) ||
+    !isVerificationStatus(verificationStatus) ||
     !createdAt ||
     !updatedAt ||
-    sizeBytes === null
+    sizeBytes === null ||
+    currentVersionId === undefined
   ) {
     return null;
   }
@@ -105,11 +133,19 @@ export function parsePublicEvidence(value: unknown): PublicEvidence | null {
   if (value.currentVersion != null && !currentVersion) {
     return null;
   }
+  if (
+    currentVersion &&
+    (currentVersion.id !== currentVersionId ||
+      currentVersion.evidenceId !== id ||
+      currentVersion.sha256 !== sha256)
+  ) {
+    return null;
+  }
 
   return {
     id,
     milestoneId,
-    currentVersionId: asNullableString(value.currentVersionId),
+    currentVersionId,
     fileName,
     sha256,
     mimeType,
@@ -131,5 +167,6 @@ export type EvidenceUploadPhase =
   | "too_large"
   | "unauthorized"
   | "forbidden"
+  | "notfound"
   | "conflict"
   | "unavailable";

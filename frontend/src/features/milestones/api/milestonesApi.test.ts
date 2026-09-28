@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "../../../services/api/client";
 import { milestoneRecord } from "../../../tests/fixtures";
-import { listProjectMilestones } from "./milestonesApi";
+import {
+  createMilestone,
+  getMilestone,
+  listMilestones,
+  listProjectMilestones,
+} from "./milestonesApi";
 
 vi.mock("../../../services/api/client", () => ({
   apiRequest: vi.fn(),
@@ -33,6 +38,13 @@ describe("milestonesApi envelopes", () => {
     expect(apiRequest).toHaveBeenCalledWith("/projects/p1/milestones");
   });
 
+  it("exposes the repository-neutral listMilestones alias", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ milestones: [foundation] });
+
+    await expect(listMilestones("p1")).resolves.toEqual([foundation]);
+    expect(apiRequest).toHaveBeenCalledWith("/projects/p1/milestones");
+  });
+
   it("unwraps multiple milestone records", async () => {
     vi.mocked(apiRequest).mockResolvedValue({ milestones: [foundation, structure] });
 
@@ -50,6 +62,46 @@ describe("milestonesApi envelopes", () => {
 
     const [milestone] = await listProjectMilestones("p1");
     expect(milestone.status).toBe("FAILED");
+  });
+
+  it("unwraps the existing milestone detail response", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ milestone: foundation });
+
+    await expect(getMilestone("m1")).resolves.toEqual(foundation);
+    expect(apiRequest).toHaveBeenCalledWith("/milestones/m1");
+  });
+
+  it("rejects a malformed milestone detail response", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({ data: { milestone: foundation } });
+
+    await expect(getMilestone("m1")).rejects.toThrow(
+      "The milestone response is not in a known format.",
+    );
+  });
+
+  it("unwraps a milestone creation envelope", async () => {
+    const created = milestoneRecord({
+      id: "m3",
+      name: "Inspection",
+      status: "PENDING",
+      projectId: "p1",
+      description: "Site inspection",
+    });
+    vi.mocked(apiRequest).mockResolvedValue({ data: { milestone: created }, meta: {} });
+
+    await expect(
+      createMilestone("p1", {
+        name: "Inspection",
+        description: "Site inspection",
+      }),
+    ).resolves.toEqual(created);
+    expect(apiRequest).toHaveBeenCalledWith("/projects/p1/milestones", {
+      method: "POST",
+      body: {
+        name: "Inspection",
+        description: "Site inspection",
+      },
+    });
   });
 
   it("rejects a raw milestone array", async () => {

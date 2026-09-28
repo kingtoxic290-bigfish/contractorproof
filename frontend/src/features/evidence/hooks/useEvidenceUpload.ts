@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { ApiError, userFacingError } from "../../../services/api/errors";
-import { createEvidence } from "../api/evidenceApi";
+import { uploadEvidence } from "../api/evidenceApi";
 import type { EvidenceUploadPhase, PublicEvidence } from "../types";
 import { validateEvidenceFile } from "../validation";
 
@@ -21,6 +21,9 @@ function phaseFromError(error: unknown): EvidenceUploadPhase {
     if (error.isForbidden) {
       return "forbidden";
     }
+    if (error.isNotFound) {
+      return "notfound";
+    }
     if (error.isConflict || error.code === "HASH_CONFLICT") {
       return "conflict";
     }
@@ -29,6 +32,21 @@ function phaseFromError(error: unknown): EvidenceUploadPhase {
     }
   }
   return "failed";
+}
+
+function uploadErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.isUnauthorized) {
+      return "Your session has expired. Sign in again to upload evidence.";
+    }
+    if (error.isForbidden) {
+      return "You do not have permission to upload evidence.";
+    }
+    if (error.isNotFound) {
+      return "The selected milestone was not found.";
+    }
+  }
+  return userFacingError(error, "The evidence file could not be uploaded.");
 }
 
 export function useEvidenceUpload() {
@@ -65,14 +83,14 @@ export function useEvidenceUpload() {
     setError(null);
     setResult(null);
     try {
-      const evidence = await createEvidence({ milestoneId, file });
+      const evidence = await uploadEvidence({ milestoneId, file });
       setResult(evidence);
       setPhase("uploaded");
       return evidence;
     } catch (cause) {
       setResult(null);
       setPhase(phaseFromError(cause));
-      setError(userFacingError(cause, "The evidence file could not be uploaded."));
+      setError(uploadErrorMessage(cause));
       return null;
     }
   }, []);

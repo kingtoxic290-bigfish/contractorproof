@@ -4,6 +4,9 @@ import { ErrorState } from "../../../components/feedback/ErrorState";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { Card } from "../../../components/ui/Card";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { MilestoneList } from "../../milestones/components/MilestoneList";
+import { useProjectMilestones } from "../../milestones/hooks/useProjectMilestones";
+import { QueryPanel } from "../../shared/QueryPanel";
 import { StateLabel } from "../../shared/StateLabel";
 import { queryErrorMessage } from "../../shared/query";
 import { getContractor } from "../../contractors/api/contractorsApi";
@@ -13,6 +16,7 @@ import type { PublicProject } from "../types";
 
 export function ProjectDetailPage() {
   const { projectId } = useParams();
+  const milestones = useProjectMilestones(projectId);
   const location = useLocation();
   const notice = (location.state as { notice?: unknown } | null)?.notice;
   const [state, setState] = useState<
@@ -97,9 +101,35 @@ export function ProjectDetailPage() {
               <Field label="Updated" value={state.project.updatedAt} />
             </dl>
           </Card>
-          <Card title="Related records" description="Project milestones and evidence have separate routes and are outside this task's workflow scope.">
-            <p className="text-sm text-stone-700">No related records are loaded on this page.</p>
+          <Card title="Related records" description="Milestones and evidence are loaded from their project-scoped backend routes.">
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to={`/evidence?projectId=${encodeURIComponent(state.project.id)}`}
+                className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              >
+                View project evidence
+              </Link>
+              <Link
+                to={`/projects/${encodeURIComponent(state.project.id)}/milestones/new`}
+                className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              >
+                Create milestone
+              </Link>
+            </div>
           </Card>
+          <section aria-labelledby="project-milestones-heading">
+            <h2 id="project-milestones-heading" className="mb-3 font-serif text-xl text-stone-900">Milestones</h2>
+            <QueryPanel
+              status={milestones.status}
+              error={milestones.error}
+              onRetry={() => void milestones.retry()}
+              loadingMessage="Loading milestone information..."
+              emptyTitle="No milestones available."
+              emptyDescription="The API returned no milestone records for this project."
+            >
+              <MilestoneList records={milestones.records} projectId={state.project.id} />
+            </QueryPanel>
+          </section>
         </>
       ) : null}
     </section>

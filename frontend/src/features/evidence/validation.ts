@@ -53,6 +53,14 @@ export function validateEvidenceFile(file: File): FileValidationResult {
   if (!expectedMime) {
     return { ok: false, reason: "unsupported" };
   }
+  const providedMime = file.type.trim().toLowerCase().split(";")[0]?.trim();
+  const normalizedMime =
+    providedMime === "image/jpg" || providedMime === "image/pjpeg"
+      ? "image/jpeg"
+      : providedMime;
+  if (normalizedMime && normalizedMime !== expectedMime) {
+    return { ok: false, reason: "unsupported" };
+  }
   return { ok: true };
 }
 

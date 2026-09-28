@@ -7,6 +7,8 @@ import { RoleGate } from "../features/auth/RoleGate";
 import { ContractorDetailPage } from "../features/contractors/pages/ContractorDetailPage";
 import { ContractorsPage } from "../features/contractors/pages/ContractorsPage";
 import { EvidencePage } from "../features/evidence/pages/EvidencePage";
+import { MilestoneCreatePage } from "../features/milestones/pages/MilestoneCreatePage";
+import { MilestoneDetailPage } from "../features/milestones/pages/MilestoneDetailPage";
 import { MilestonesPage } from "../features/milestones/pages/MilestonesPage";
 import { PassportDetailPage } from "../features/passports/pages/PassportDetailPage";
 import { PassportsPage } from "../features/passports/pages/PassportsPage";
@@ -60,7 +62,16 @@ export function AppRouter() {
           }
         />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+        <Route
+          path="/projects/:projectId/milestones/new"
+          element={
+            <RoleGate allow={["CONTRACTOR", "ADMIN"]}>
+              <MilestoneCreatePage />
+            </RoleGate>
+          }
+        />
         <Route path="/milestones" element={<MilestonesPage />} />
+        <Route path="/milestones/:milestoneId" element={<MilestoneDetailPage />} />
         <Route path="/evidence" element={<EvidencePage />} />
         <Route
           path="/verification"

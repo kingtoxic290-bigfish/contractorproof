@@ -1,7 +1,12 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { listProjectMilestones } from "../features/milestones/api/milestonesApi";
+import {
+  createMilestone,
+  getMilestone,
+  listProjectMilestones,
+} from "../features/milestones/api/milestonesApi";
+import { listEvidence } from "../features/evidence/api/evidenceApi";
 import { authApi } from "../services/api/auth";
 import { ApiError } from "../services/api/errors";
 import { milestoneRecord } from "./fixtures";
@@ -17,10 +22,17 @@ vi.mock("../services/api/auth", () => ({
 
 vi.mock("../features/milestones/api/milestonesApi", () => ({
   listProjectMilestones: vi.fn(),
+  getMilestone: vi.fn(),
+  createMilestone: vi.fn(),
+}));
+
+vi.mock("../features/evidence/api/evidenceApi", () => ({
+  listEvidence: vi.fn(),
 }));
 
 describe("milestones", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     seedSession();
     vi.mocked(authApi.me).mockResolvedValue({
       id: "user-2",
@@ -28,6 +40,7 @@ describe("milestones", () => {
       fullName: "Demo Auditor",
       role: "AUDITOR",
     });
+    vi.mocked(listEvidence).mockResolvedValue([]);
   });
 
   it("does not fetch until a project identifier is provided", async () => {
@@ -85,6 +98,19 @@ describe("milestones", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
   });
 
+  it.each([
+    [401, "You need to sign in to view this information."],
+    [403, "You do not have permission to view this information."],
+  ])("handles milestone list HTTP %i without changing the session", async (status, message) => {
+    vi.mocked(listProjectMilestones).mockRejectedValue(new ApiError(status, "request rejected"));
+    const user = userEvent.setup();
+    renderApp("/milestones");
+    await user.type(await screen.findByLabelText("Project identifier"), "p1");
+    await user.click(screen.getByRole("button", { name: "Load milestones" }));
+    expect(await screen.findByText(message)).toBeInTheDocument();
+    expect(authApi.me).toHaveBeenCalled();
+  });
+
   it("shows a not-found state when the project is missing", async () => {
     vi.mocked(listProjectMilestones).mockRejectedValue(new ApiError(404, "project not found"));
     const user = userEvent.setup();
@@ -92,5 +118,80 @@ describe("milestones", () => {
     await user.type(await screen.findByLabelText("Project identifier"), "missing");
     await user.click(screen.getByRole("button", { name: "Load milestones" }));
     expect(await screen.findByText("The requested record was not found.")).toBeInTheDocument();
+  });
+
+  it("renders milestone detail from the existing endpoint and links to its evidence", async () => {
+    const foundation = milestoneRecord({
+      id: "m-detail",
+      name: "Foundation",
+      status: "PENDING",
+      projectId: "p1",
+    });
+    vi.mocked(getMilestone).mockResolvedValue(foundation);
+    renderApp("/milestones/m-detail");
+
+    expect(await screen.findByRole("heading", { name: "Foundation" })).toBeInTheDocument();
+    expect(getMilestone).toHaveBeenCalledWith("m-detail");
+    expect(screen.getByRole("link", { name: "View milestone evidence" })).toHaveAttribute(
+      "href",
+      "/evidence?milestoneId=m-detail",
+    );
+    expect(await screen.findByText("No evidence uploaded yet.")).toBeInTheDocument();
+    expect(listEvidence).toHaveBeenCalledWith({ milestoneId: "m-detail", projectId: undefined });
+  });
+
+  it.each([
+    [401, "You need to sign in to view this information."],
+    [403, "You do not have permission to view this information."],
+    [404, "The requested record was not found."],
+  ])("handles milestone detail HTTP %i", async (status, message) => {
+    vi.mocked(getMilestone).mockRejectedValue(new ApiError(status, "request rejected"));
+    renderApp("/milestones/m-detail");
+    expect(await screen.findByText(message)).toBeInTheDocument();
+  });
+
+  it("validates milestone creation and submits through the project-scoped workflow", async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "user-contractor",
+      email: "contractor@example.com",
+      fullName: "Demo Contractor",
+      role: "CONTRACTOR",
+    });
+    vi.mocked(createMilestone).mockResolvedValue(
+      milestoneRecord({ id: "m-new", name: "Inspection", status: "PENDING", projectId: "p1" }),
+    );
+    renderApp("/projects/p1/milestones/new");
+
+    await user.click(await screen.findByRole("button", { name: "Create milestone" }));
+    expect(await screen.findByText("Milestone name is required.")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Milestone name"), "Inspection");
+    await user.type(screen.getByLabelText("Description"), "Site inspection");
+    await user.click(screen.getByRole("button", { name: "Create milestone" }));
+
+    expect(await screen.findByRole("heading", { name: /Project/ })).toBeInTheDocument();
+    expect(createMilestone).toHaveBeenCalledWith("p1", {
+      name: "Inspection",
+      description: "Site inspection",
+    });
+  });
+
+  it("shows milestone creation authorization and not-found failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "user-contractor",
+      email: "contractor@example.com",
+      fullName: "Demo Contractor",
+      role: "CONTRACTOR",
+    });
+    vi.mocked(createMilestone).mockRejectedValueOnce(new ApiError(403, "insufficient permission"));
+    renderApp("/projects/p1/milestones/new");
+    await user.type(await screen.findByLabelText("Milestone name"), "Inspection");
+    await user.click(screen.getByRole("button", { name: "Create milestone" }));
+    expect(await screen.findByText("insufficient permission")).toBeInTheDocument();
+
+    vi.mocked(createMilestone).mockRejectedValueOnce(new ApiError(404, "project not found"));
+    await user.click(screen.getByRole("button", { name: "Create milestone" }));
+    expect(await screen.findByText("project not found")).toBeInTheDocument();
   });
 });

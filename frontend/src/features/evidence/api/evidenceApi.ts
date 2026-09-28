@@ -1,5 +1,6 @@
 import { apiRequest } from "../../../services/api/client";
 import { isPlainRecord } from "../../shared/query";
+import { isUuid } from "../validation";
 import { parsePublicEvidence, type PublicEvidence } from "../types";
 
 function unwrapEvidenceData(payload: unknown): unknown {
@@ -13,6 +14,12 @@ export async function listEvidence(filters: {
   milestoneId?: string;
   projectId?: string;
 } = {}): Promise<PublicEvidence[]> {
+  if (filters.milestoneId && !isUuid(filters.milestoneId)) {
+    throw new Error("A valid milestone identifier is required to list evidence.");
+  }
+  if (filters.projectId && !isUuid(filters.projectId)) {
+    throw new Error("A valid project identifier is required to list evidence.");
+  }
   const params = new URLSearchParams();
   if (filters.milestoneId) {
     params.set("milestoneId", filters.milestoneId);
@@ -36,10 +43,21 @@ export async function listEvidence(filters: {
   return evidence;
 }
 
-export async function createEvidence(input: {
+export function listEvidenceByProject(projectId: string): Promise<PublicEvidence[]> {
+  return listEvidence({ projectId });
+}
+
+export function listEvidenceByMilestone(milestoneId: string): Promise<PublicEvidence[]> {
+  return listEvidence({ milestoneId });
+}
+
+export async function uploadEvidence(input: {
   milestoneId: string;
   file: File;
 }): Promise<PublicEvidence> {
+  if (!isUuid(input.milestoneId)) {
+    throw new Error("A valid milestone identifier is required to upload evidence.");
+  }
   const body = new FormData();
   body.append("milestoneId", input.milestoneId);
   body.append("file", input.file);
@@ -54,3 +72,5 @@ export async function createEvidence(input: {
   }
   return record;
 }
+
+export const createEvidence = uploadEvidence;

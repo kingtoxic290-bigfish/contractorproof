@@ -79,6 +79,35 @@ Commit hash is reported in the Task 6 completion report.
 
 ---
 
+## AGENT 2 TASK 5 — Milestones + Evidence Frontend Workflow
+
+## STATUS
+
+COMPLETE
+
+The frontend now completes the project-to-milestone-to-evidence workflow against the existing backend contracts. Project detail lists project-scoped milestones and provides direct access to project evidence and milestone creation. Milestone detail uses the existing authenticated `GET /api/v1/milestones/:milestoneId` route; no new backend endpoint was introduced.
+
+Evidence listing uses the backend's project and milestone query filters. Upload sends multipart `milestoneId` and `file` fields through the shared API client, displays the returned evidence/current-version DTO, and refreshes the active list. Responses are strictly parsed, including the canonical SHA-256 and the backend verification enum. Upload is not verification; no comparison action, result, trust score, or Task 6 route was added.
+
+Authorization remains backend-authoritative. CONTRACTOR and ADMIN are the only roles offered upload controls, matching `EVIDENCE_UPLOAD`; 401 continues through the shared session-expiration mechanism, 403 does not clear the session, and 404 is rendered as not found. Invalid evidence URL filters are rejected visibly instead of being dropped into an unfiltered request.
+
+TESTS:
+
+* Focused milestone/evidence API and UI tests cover list/create/detail contracts, empty/malformed responses, upload FormData fields, local/backend validation, success refresh, SHA-256/current version display, persisted status display, and 401/403/404 handling.
+* `cd frontend && npm test -- --run` — 27/27 files, 190/190 tests PASS.
+* `cd frontend && npm run build` — PASS, including TypeScript compilation.
+* Browser layout inspection at 1440px, 768px, and 390px — PASS; no page-level horizontal overflow.
+
+KNOWN LIMITATIONS:
+
+* Evidence list/create responses expose only `currentVersion`; no evidence detail or version-history API is mounted, so earlier version records are unavailable to the frontend.
+* Evidence DTOs do not include project names/IDs. The frontend displays the returned milestone ID and project filter context only.
+* Live backend smoke testing was NOT RUN because `http://localhost:4000/health` refused the connection. No backend files were modified.
+
+TASK 6 STATUS: NOT STARTED.
+
+---
+
 ## AGENT 2 TASK 4 — Contractors + Projects Frontend Workflow
 
 ## STATUS

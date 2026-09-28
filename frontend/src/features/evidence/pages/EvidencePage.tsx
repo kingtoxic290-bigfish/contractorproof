@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
@@ -16,21 +16,45 @@ function optionalUuid(value: string | null): string | undefined {
 
 export function EvidencePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const projectId = optionalUuid(searchParams.get("projectId"));
-  const milestoneId = optionalUuid(searchParams.get("milestoneId"));
-  const { status, records, error, retry } = useEvidence(milestoneId, projectId);
-  const [projectInput, setProjectInput] = useState(projectId ?? "");
-  const [milestoneInput, setMilestoneInput] = useState(milestoneId ?? "");
+  const rawProjectId = searchParams.get("projectId")?.trim() ?? "";
+  const rawMilestoneId = searchParams.get("milestoneId")?.trim() ?? "";
+  const projectId = optionalUuid(rawProjectId || null);
+  const milestoneId = optionalUuid(rawMilestoneId || null);
+  const queryFilterError =
+    (rawProjectId && !projectId ? "Project identifier must be a valid UUID." : null) ??
+    (rawMilestoneId && !milestoneId ? "Milestone identifier must be a valid UUID." : null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const filterError = inputError ?? queryFilterError;
+  const { status, records, error, retry } = useEvidence(milestoneId, projectId, !filterError);
+  const [projectInput, setProjectInput] = useState(rawProjectId);
+  const [milestoneInput, setMilestoneInput] = useState(rawMilestoneId);
+
+  useEffect(() => {
+    setProjectInput(rawProjectId);
+    setMilestoneInput(rawMilestoneId);
+    setInputError(null);
+  }, [rawMilestoneId, rawProjectId]);
 
   function applyFilters(event: FormEvent) {
     event.preventDefault();
     const next = new URLSearchParams();
-    if (optionalUuid(projectInput)) {
-      next.set("projectId", projectInput.trim());
+    const normalizedProjectId = projectInput.trim();
+    const normalizedMilestoneId = milestoneInput.trim();
+    if (normalizedProjectId && !isUuid(normalizedProjectId)) {
+      setInputError("Project identifier must be a valid UUID.");
+      return;
     }
-    if (optionalUuid(milestoneInput)) {
-      next.set("milestoneId", milestoneInput.trim());
+    if (normalizedMilestoneId && !isUuid(normalizedMilestoneId)) {
+      setInputError("Milestone identifier must be a valid UUID.");
+      return;
     }
+    if (normalizedProjectId) {
+      next.set("projectId", normalizedProjectId);
+    }
+    if (normalizedMilestoneId) {
+      next.set("milestoneId", normalizedMilestoneId);
+    }
+    setInputError(null);
     setSearchParams(next);
   }
 
@@ -65,6 +89,7 @@ export function EvidencePage() {
             <Button type="submit">Apply filters</Button>
           </div>
         </form>
+        {filterError ? <p className="mt-3 text-sm text-red-700" role="alert">{filterError}</p> : null}
         <p className="mt-3 text-sm text-stone-600">
           Open evidence from a{" "}
           <Link
@@ -90,16 +115,18 @@ export function EvidencePage() {
         onUploaded={() => void retry()}
       />
 
-      <QueryPanel
-        status={status}
-        error={error}
-        onRetry={() => void retry()}
-        loadingMessage="Loading evidence..."
-        emptyTitle="No evidence uploaded yet."
-        emptyDescription="The API returned no evidence records for this view."
-      >
-        <EvidenceList records={records} />
-      </QueryPanel>
+      {filterError ? null : (
+        <QueryPanel
+          status={status}
+          error={error}
+          onRetry={() => void retry()}
+          loadingMessage="Loading evidence..."
+          emptyTitle="No evidence uploaded yet."
+          emptyDescription="The API returned no evidence records for this view."
+        >
+          <EvidenceList records={records} />
+        </QueryPanel>
+      )}
     </section>
   );
 }

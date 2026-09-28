@@ -4,15 +4,16 @@ import { Card } from "../../../components/ui/Card";
 import { ErrorState } from "../../../components/feedback/ErrorState";
 import { LoadingState } from "../../../components/feedback/LoadingState";
 import { useAuth } from "../../../hooks/useAuth";
-import { listProjectMilestones } from "../../milestones/api/milestonesApi";
+import { userFacingError } from "../../../services/api/errors";
+import { getMilestone, listProjectMilestones } from "../../milestones/api/milestonesApi";
 import { listProjects } from "../../projects/api/projectsApi";
 import type { PublicMilestone } from "../../milestones/types";
 import type { PublicProject } from "../../projects/types";
 import { useEvidenceUpload } from "../hooks/useEvidenceUpload";
-import type { PublicEvidence } from "../types";
+import type { EvidenceUploadPhase, PublicEvidence } from "../types";
 import { EVIDENCE_ACCEPT, formatFileSize, isUuid } from "../validation";
 
-const PHASE_LABEL: Record<string, string> = {
+const PHASE_LABEL: Record<EvidenceUploadPhase, string> = {
   ready: "Ready",
   uploading: "Uploading",
   uploaded: "Uploaded",
@@ -21,6 +22,7 @@ const PHASE_LABEL: Record<string, string> = {
   too_large: "Too large",
   unauthorized: "Unauthorized",
   forbidden: "Forbidden",
+  notfound: "Not found",
   conflict: "Conflict",
   unavailable: "Server unavailable",
 };
@@ -46,6 +48,8 @@ export function EvidenceUpload({
   const [milestoneId, setMilestoneId] = useState(initialMilestoneId ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [loadingMilestones, setLoadingMilestones] = useState(false);
 
   useEffect(() => {
     setProjectId(initialProjectId ?? "");
@@ -57,15 +61,21 @@ export function EvidenceUpload({
       return;
     }
     let cancelled = false;
+    setLoadingProjects(true);
     void listProjects()
       .then((rows) => {
         if (!cancelled) {
           setProjects(rows);
         }
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (!cancelled) {
-          setLoadError("Project records could not be loaded for the upload form.");
+          setLoadError(userFacingError(cause, "Project records could not be loaded for the upload form."));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingProjects(false);
         }
       });
     return () => {
@@ -74,21 +84,53 @@ export function EvidenceUpload({
   }, [canUpload]);
 
   useEffect(() => {
+    if (!canUpload || !initialMilestoneId || initialProjectId) {
+      return;
+    }
+    let cancelled = false;
+    void getMilestone(initialMilestoneId)
+      .then((milestone) => {
+        if (!cancelled) {
+          setProjectId(milestone.projectId);
+        }
+      })
+      .catch((cause: unknown) => {
+        if (!cancelled) {
+          setLoadError(userFacingError(cause, "The selected milestone could not be loaded."));
+          setMilestoneId("");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canUpload, initialMilestoneId, initialProjectId]);
+
+  useEffect(() => {
     if (!canUpload || !projectId || !isUuid(projectId)) {
       setMilestones([]);
       return;
     }
     let cancelled = false;
+    setLoadingMilestones(true);
     void listProjectMilestones(projectId)
       .then((rows) => {
         if (!cancelled) {
           setMilestones(rows);
+          setMilestoneId((selected) => (rows.some((row) => row.id === selected) ? selected : ""));
         }
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (!cancelled) {
           setMilestones([]);
-          setLoadError("Milestone records could not be loaded for the selected project.");
+          setMilestoneId("");
+          setLoadError(
+            userFacingError(cause, "Milestone records could not be loaded for the selected project."),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingMilestones(false);
         }
       });
     return () => {
@@ -123,7 +165,7 @@ export function EvidenceUpload({
       title="Upload evidence"
       description="Attach a file to an existing milestone. The file is stored, fingerprinted with SHA-256, and recorded as PENDING_VERIFICATION. Upload is not verification."
     >
-      <form className="grid gap-4" onSubmit={onSubmit}>
+      <form className="grid gap-4" onSubmit={onSubmit} noValidate>
         <div
           className="inline-flex w-fit items-center gap-2 rounded-full border border-stone-300 bg-stone-50 px-2.5 py-1 text-xs font-medium text-stone-800"
           role="status"
@@ -143,10 +185,12 @@ export function EvidenceUpload({
             onChange={(event) => {
               setProjectId(event.target.value);
               setMilestoneId("");
+              setLoadError(null);
               reset();
             }}
+            disabled={loadingProjects}
           >
-            <option value="">Select a project</option>
+            <option value="">{loadingProjects ? "Loading projects..." : "Select a project"}</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
@@ -165,12 +209,18 @@ export function EvidenceUpload({
               setMilestoneId(event.target.value);
               reset();
             }}
+            disabled={!projectId || loadingMilestones || milestones.length === 0}
             required
           >
-            <option value="">{projectId ? "Select a milestone" : "Select a project first"}</option>
-            {milestoneId && !milestones.some((milestone) => milestone.id === milestoneId) ? (
-              <option value={milestoneId}>Milestone {milestoneId}</option>
-            ) : null}
+            <option value="">
+              {loadingMilestones
+                ? "Loading milestones..."
+                : !projectId
+                  ? "Select a project first"
+                  : milestones.length
+                    ? "Select a milestone"
+                    : "No milestones available"}
+            </option>
             {milestones.map((milestone) => (
               <option key={milestone.id} value={milestone.id}>
                 {milestone.name}

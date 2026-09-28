@@ -12,6 +12,11 @@ describe("evidence file validation", () => {
     expect(validateEvidenceFile(file)).toEqual({ ok: false, reason: "unsupported" });
   });
 
+  it("rejects a MIME type that does not match an allowed extension", () => {
+    const file = new File(["abc"], "site.jpg", { type: "application/pdf" });
+    expect(validateEvidenceFile(file)).toEqual({ ok: false, reason: "unsupported" });
+  });
+
   it("rejects an oversized file", () => {
     const file = new File([new Uint8Array(EVIDENCE_MAX_FILE_BYTES + 1)], "big.jpg", {
       type: "image/jpeg",
