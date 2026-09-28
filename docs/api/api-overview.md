@@ -27,7 +27,7 @@ Decision: [ADR-0004](../architecture/adr/ADR-0004-api-versioning.md)
 | Attestations | `/api/v1/attestations` | 501 | Phase 3 |
 | Passports | `/api/v1/passports` | 501 | Phase 4 derived projection |
 | Disputes | `/api/v1/disputes` | 200 / 201 | Authenticated project access; append-only lifecycle |
-| Corrections | `/api/v1/corrections` | 501 | After evidence |
+| Corrections | `/api/v1/corrections` | 200 / 201 | Authenticated project access; append-only lifecycle |
 | Variations | `/api/v1/variations` | 501 | After evidence |
 | Audit | `/api/v1/audit` | Missing | After writes exist |
 | Public verify | `/api/v1/public/verify` | GET scaffold, POST compare | Agent 7 owns Passport presentation |

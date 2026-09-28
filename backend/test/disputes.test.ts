@@ -647,6 +647,7 @@ describe("dispute review and resolution", () => {
       registerProject: async () => { throw new Error("unused"); },
       recordProof: async () => { throw new Error("unused"); },
       recordAttestation: async () => { throw new Error("unused"); },
+      recordCorrection: async () => { throw new Error("unused"); },
       recordDispute: async () => { throw new Error("RPC unavailable"); },
       recordResolution: async () => { throw new Error("unused"); },
     };
@@ -695,6 +696,7 @@ describe("dispute review and resolution", () => {
       registerProject: async () => { throw new Error("unused"); },
       recordProof: async () => { throw new Error("unused"); },
       recordAttestation: async () => { throw new Error("unused"); },
+      recordCorrection: async () => ({ txHash: `0x${"6".repeat(64)}`, blockNumber: 6, evidenceHash: "" }),
       recordDispute: async () => ({ txHash: `0x${"4".repeat(64)}`, blockNumber: 4, evidenceHash: null }),
       recordResolution: async () => ({ txHash: `0x${"5".repeat(64)}`, blockNumber: 5, evidenceHash: null }),
     };

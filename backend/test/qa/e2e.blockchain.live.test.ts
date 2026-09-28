@@ -100,6 +100,18 @@ describe.sequential("E2E-029 live Hardhat BlockchainService", () => {
     expect(attestation.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
     expect(await chain.eventExists(attestationEventId)).toBe(true);
 
+    const correctionEventId = randomUUID();
+    const correction = await chain.recordCorrection({
+      eventId: correctionEventId,
+      previousEventId: verificationEventId,
+      evidenceHash: HASH_A,
+      actorId,
+    });
+    expect(correction.evidenceHash).toBe(HASH_A);
+    expect(correction.txHash).toMatch(/^0x[0-9a-f]{64}$/i);
+    expect(correction.blockNumber).toBeGreaterThan(0);
+    expect(await chain.eventExists(correctionEventId)).toBe(true);
+
     const disputeEventId = randomUUID();
     const dispute = await chain.recordDispute({
       eventId: disputeEventId,

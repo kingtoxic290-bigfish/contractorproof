@@ -74,10 +74,10 @@ resolver, timestamp, and optional corrected EvidenceVersion. Distinct correction
 allowed; an identical resolution retry returns the stored row and conflicting outcomes return 409.
 
 For VERIFICATION source events, the original EvidenceVersion is linked and validated against the
-milestone. A resolved approved evidence correction links a later immutable EvidenceVersion using
-the existing evidence versioning service. Original versions, hashes, Verification rows, and
-BlockchainEvents remain available. Evidence.currentVersionId advances according to the existing
-version model.
+milestone. A resolved approved correction links a version from the corrected evidence, which can
+be a separate Evidence row or a later version of the original. Original versions, hashes,
+Verification rows, and BlockchainEvents remain available. Evidence.currentVersionId advances only
+when the existing Evidence row itself receives a new version.
 
 Authorization reuses existing project helpers and permission roles. Contractors are limited to
 their projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER use established privileged read/resolution
@@ -92,17 +92,17 @@ was not changed.
 
 TESTS:
 
-* Focused correction suite — 27/27 PASS
+* Focused correction suite — 28/28 PASS
 * Dispute regression — 25/25 PASS
 * Passport regression — 8/8 PASS
-* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — 231/231 PASS
+* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — 232/232 PASS
 * `npx tsc --noEmit` — PASS
 * `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
 * Hardhat — 6/6 PASS; live backend Hardhat BlockchainService tests — 3/3 PASS
 
 KNOWN LIMITATIONS:
 
-* Version append updates the parent Evidence row's current-version metadata as defined by the
+* Appending a version on the original Evidence row advances its current-version metadata under the
   existing version model; the original EvidenceVersion and verification history remain immutable.
 * Blockchain correction proofs require a confirmed original event and an approved corrected
   EvidenceVersion. Project-information corrections without evidence remain database-only.

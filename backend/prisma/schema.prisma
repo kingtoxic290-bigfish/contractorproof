@@ -42,6 +42,13 @@ enum DisputeStatus {
   REJECTED
 }
 
+enum CorrectionStatus {
+  OPEN
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum BlockchainEventType {
   PROJECT_REGISTERED
   VERIFICATION
@@ -85,6 +92,7 @@ model User {
   blockchainEvents         BlockchainEvent[]    @relation("BlockchainEventActor")
   verifications            Verification[]
   disputeResolutions       DisputeResolution[]  @relation("DisputeResolutionActor")
+  correctionResolutions    CorrectionResolution[] @relation("CorrectionResolutionActor")
 }
 
 model Contractor {
@@ -225,6 +233,8 @@ model EvidenceVersion {
   createdAt        DateTime @default(now())
 
   verifications Verification[]
+  correctionsAsOriginal Correction[] @relation("CorrectionOriginalVersion")
+  correctionResolutions CorrectionResolution[] @relation("CorrectionCorrectedVersion")
 
   @@unique([id, evidenceId])
   @@unique([evidenceId, versionNumber])
@@ -294,6 +304,7 @@ model BlockchainEvent {
   disputesAsOriginal   Dispute[]           @relation("DisputeOriginalEvent")
   disputesAsResolution Dispute[]           @relation("DisputeResolutionEvent")
   disputesAsProof      Dispute[]           @relation("DisputeProofEvent")
+  correctionsAsProof   Correction[]        @relation("CorrectionProofEvent")
   corrections          Correction[]
   variations           ContractVariation[]
 
@@ -344,21 +355,46 @@ model DisputeResolution {
 }
 
 model Correction {
-  id              String           @id @default(uuid())
-  milestoneId     String
-  milestone       Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
-  originalEventId String
-  originalEvent   BlockchainEvent  @relation(fields: [originalEventId], references: [id], onDelete: Restrict)
-  reason          String
-  evidenceId      String?
-  evidence        Evidence?        @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
-  actorId         String
-  actor           User             @relation(fields: [actorId], references: [id], onDelete: Restrict)
-  createdAt       DateTime         @default(now())
+  id                       String                    @id @default(uuid())
+  milestoneId              String
+  milestone                Milestone                 @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  originalEventId          String
+  originalEvent            BlockchainEvent           @relation(fields: [originalEventId], references: [id], onDelete: Restrict)
+  originalEvidenceVersionId String?
+  originalEvidenceVersion  EvidenceVersion?          @relation("CorrectionOriginalVersion", fields: [originalEvidenceVersionId], references: [id], onDelete: Restrict)
+  reason                   String
+  evidenceId               String?
+  evidence                 Evidence?                 @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  actorId                  String
+  actor                    User                      @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  status                   CorrectionStatus          @default(OPEN)
+  correctionEventId        String?                   @unique
+  correctionEvent          BlockchainEvent?          @relation("CorrectionProofEvent", fields: [correctionEventId], references: [id], onDelete: Restrict)
+  resolutions              CorrectionResolution[]
+  createdAt                DateTime                  @default(now())
 
   @@index([milestoneId])
   @@index([originalEventId])
   @@index([actorId])
+  @@index([originalEvidenceVersionId])
+  @@index([status])
+}
+
+model CorrectionResolution {
+  id                       String           @id @default(uuid())
+  correctionId             String           @unique
+  correction               Correction       @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  status                   CorrectionStatus
+  resolution               String
+  correctedEvidenceVersionId String?
+  correctedEvidenceVersion EvidenceVersion? @relation("CorrectionCorrectedVersion", fields: [correctedEvidenceVersionId], references: [id], onDelete: Restrict)
+  resolvedById             String
+  resolvedBy               User             @relation("CorrectionResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt                DateTime         @default(now())
+
+  @@index([correctedEvidenceVersionId])
+  @@index([resolvedById])
+  @@index([createdAt])
 }
 
 model ContractVariation {

@@ -372,29 +372,17 @@ There is no `GET /api/v1/disputes/:id` and no resolve/reject route in this slice
 
 ## Corrections
 
-Canonical routes: `POST /api/v1/corrections` and `GET /api/v1/corrections`.  
-Envelope: `{ "data": { "correction": { ... } }, "meta": {} }` on create.  
-List: `{ "data": { "corrections": [ ... ] }, "meta": {} }`.
+Authenticated endpoints: `POST /api/v1/corrections`, `GET /api/v1/corrections`, `GET /api/v1/corrections/:correctionId`, `POST /api/v1/corrections/:correctionId/review`, and `POST /api/v1/corrections/:correctionId/resolve`.
 
-This is not a variation, dispute resolution, attestation, or blockchain write.
+All correction responses use `{ "data": ..., "meta": {} }`; domain errors use `{ "error": { "code", "message", "requestId" } }`. Authentication middleware retains the established 401 response.
 
-Auth: JWT  
-Create roles: CONTRACTOR (own project), ADMIN.  
-CLIENT / CONSULTANT_ENGINEER pass the create role gate but have no project membership yet → 403.  
-AUDITOR / PROCUREMENT_OFFICER cannot create (403).
+Creation stores OPEN. A resolver transitions OPEN → UNDER_REVIEW → APPROVED/REJECTED. Review retries at UNDER_REVIEW are idempotent. The terminal result, note, resolver, timestamp, and optional corrected version are appended to one `CorrectionResolution` row; matching resolution retries return it, conflicting retries return 409. Distinct correction requests are allowed because the domain defines no uniqueness key.
 
-Read: project access, applied in the database query.  
-Privileged read: ADMIN, AUDITOR, PROCUREMENT_OFFICER.  
-CONTRACTOR: own projects only.  
-CLIENT / CONSULTANT_ENGINEER: empty list (no membership model yet).
+Create roles: CONTRACTOR on own project and ADMIN. Read access follows project access: CONTRACTOR own projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER follow the privileged read rules. Resolver roles are ADMIN, AUDITOR, PROCUREMENT_OFFICER. Other roles have no project membership and are denied/receive an empty filtered list as applicable. Client-supplied actor/status fields are ignored.
 
-`actorId` is always the authenticated user. Client-supplied `actorId`, `userId`, `createdById`, `correctedById`, `role`, `status`, and `decision` are ignored.
+`originalEventId` must belong to the milestone's project. When it is a VERIFICATION event, its reference must resolve to an EvidenceVersion on that milestone; its id/hash are kept as the correction's original version. Optional `evidenceId` identifies corrected/related evidence on the same milestone and may be the existing evidence with a later version or a separate newly uploaded Evidence record. An approved evidence correction must link a version from that evidence; if it uses the original Evidence record, the version must be later than the original. EvidenceVersion rows remain immutable; appending on the same Evidence advances only its current-version projection.
 
-Prisma `Correction` has no status/decision enum. There is no resolution endpoint.
-
-`originalEventId` is required by the schema and must reference an existing `BlockchainEvent` on the same project. This slice does **not** call BlockchainService or create blockchain events.
-
-Optional `evidenceId` may link existing evidence on the same milestone. This slice does **not** create or mutate EvidenceVersion rows.
+No evidence is copied into a correction-specific store. Evidence versions and verifications remain separately queryable. Correction blockchain proof is attempted only for APPROVED corrections with a corrected version and a confirmed original event. Pending transactions are explicitly unconfirmed; failed chain writes do not claim confirmation. Retrying the same resolution reuses its pending logical event and can confirm it after recovery. No blockchain event is created without those conditions.
 
 ### POST `/api/v1/corrections`
 
@@ -405,7 +393,7 @@ Request:
   "milestoneId": "uuid",
   "originalEventId": "uuid",
   "reason": "as-built drawing supersedes issued set",
-  "evidenceId": "optional-uuid"
+      "evidenceId": "optional-uuid"
 }
 ```
 
@@ -420,7 +408,12 @@ Request:
       "originalEventId": "uuid",
       "evidenceId": null,
       "actorId": "uuid",
+      "status": "OPEN",
       "reason": "as-built drawing supersedes issued set",
+      "originalEvidenceVersion": null,
+      "correctedEvidence": null,
+      "blockchainProof": null,
+      "resolutions": [],
       "createdAt": "2026-09-24T00:00:00.000Z"
     }
   },
@@ -441,9 +434,9 @@ Optional query: `milestoneId`, `projectId`. Inaccessible filters return `{ "data
 
 200: `{ "data": { "corrections": [ ... ] }, "meta": {} }`
 
-Responses never include `passwordHash`, `storageKey`, storage paths, `txHash`, `blockNumber`, or invented scores.
+`GET /api/v1/corrections` accepts optional `milestoneId` and `projectId` filters. `GET /:correctionId` returns one record after project authorization. Review has an empty body. Resolve body: `{ "status": "APPROVED" | "REJECTED", "resolution": "...", "correctedEvidenceVersionId?": "uuid" }`.
 
-There is no `GET /api/v1/corrections/:id` and no apply/reject route in this slice.
+Responses never include `passwordHash`, storage keys/paths, or private infrastructure secrets. Transaction hash and block number are exposed only as fields of an explicitly `CONFIRMED` or `PENDING` proof object.
 
 ## Stubs (501)
 

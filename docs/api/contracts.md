@@ -371,31 +371,23 @@ Resolver roles only. Body: `{ "status": "RESOLVED" | "REJECTED", "resolution": "
 
 Blockchain anchoring is optional and only attempted when an existing source event is confirmed. Pending rows are represented as PENDING without transaction hash/block number. No source event means no dispute/resolution proof. The contract was not changed.
 
-## Corrections (current Stage 7 HTTP)
+## Corrections (Task 5 lifecycle)
 
-Envelope: `{ "data": { "correction" | "corrections": ... }, "meta": {} }`  
-Not a Stage 2 resource-keyed collection.
+Responses use `{ "data": ..., "meta": {} }`; domain failures use the standard structured error envelope. Corrections are separate historical records; evidence versions and verification rows remain append-only.
 
-Authz: project write/read via existing access helpers. CONTRACTOR cannot create or list another contractor’s corrections.  
-CONTRACTOR cannot “resolve as verified” — there is no apply/resolve route in this slice.
+Correction status is OPEN | UNDER_REVIEW | APPROVED | REJECTED. Create stores OPEN. ADMIN, AUDITOR, and PROCUREMENT_OFFICER may review/resolve after project-read authorization. CONTRACTOR and ADMIN may create under the existing write rules. Resolution is stored separately with decision, note, resolver, timestamp, and optional corrected EvidenceVersion. A matching retry reuses the resolution; a different outcome returns 409. Multiple correction requests are allowed.
 
-The Prisma `Correction` model is authoritative: `milestoneId`, `originalEventId`, `reason`, optional `evidenceId`, `actorId`.  
-There is no correction status/decision enum.
-
-`originalEventId` is a required FK to an existing `BlockchainEvent` on the same project. This slice does **not** call BlockchainService or insert blockchain events.  
-Optional `evidenceId` links existing evidence on the same milestone. This slice does **not** create or overwrite EvidenceVersion rows.
+For a VERIFICATION source event, `referenceId` must resolve to the original EvidenceVersion on the milestone. Optional `evidenceId` identifies corrected/related evidence on that milestone and can be the original evidence with a later version or a separate Evidence record. Approved evidence corrections link a version from that evidence; when using the original Evidence row, the corrected version must be later than the original. EvidenceVersion hashes and Verification rows remain preserved.
 
 ### POST `/api/v1/corrections`
 
 Auth: JWT  
-Create roles: CONTRACTOR (own milestone/project), ADMIN.  
-CLIENT / CONSULTANT_ENGINEER pass the role gate but have no membership yet → 403.  
-AUDITOR / PROCUREMENT_OFFICER → 403.
+Create roles: CONTRACTOR (own milestone/project), ADMIN. Other roles follow existing permission and project membership rules.
 
 Body: `{ "milestoneId", "originalEventId", "reason", "evidenceId?" }`  
-Identity (`actorId`) comes from the JWT. Client-supplied actor/status/decision/role ids are ignored.
+Identity (`actorId`) comes from the JWT. Client-supplied actor/status/decision/role fields are ignored.
 
-201: `{ "data": { "correction": { "id", "milestoneId", "originalEventId", "evidenceId", "actorId", "reason", "createdAt" } }, "meta": {} }`
+201: `{ "data": { "correction": { "id", "milestoneId", "originalEventId", "originalEvidenceVersion", "evidenceId", "correctedEvidence", "actorId", "status": "OPEN", "reason", "blockchainProof": null, "resolutions": [], "createdAt" } }, "meta": {} }`
 
 400: missing/invalid UUIDs, missing `reason`, event/evidence not on the milestone project  
 401: missing or invalid JWT  
@@ -419,7 +411,21 @@ Authz: project access, enforced in the SQL `where` clause
 200: `{ "data": { "corrections": [ ... ] }, "meta": {} }`  
 Empty accessible set: `{ "data": { "corrections": [] }, "meta": {} }`
 
-There is no `GET /api/v1/corrections/:id` and no apply/reject endpoint.
+### GET `/api/v1/corrections/:correctionId`
+
+Returns a correction only after project-read authorization. Unknown correction returns 404; another contractor's correction returns 403.
+
+### POST `/api/v1/corrections/:correctionId/review`
+
+Resolver roles only. OPEN transitions to UNDER_REVIEW; repeating UNDER_REVIEW is idempotent. Terminal corrections return 409.
+
+### POST `/api/v1/corrections/:correctionId/resolve`
+
+Body: `{ "status": "APPROVED" | "REJECTED", "resolution": "...", "correctedEvidenceVersionId?": "uuid" }`. Approved evidence corrections require a version from the linked corrected evidence; if that is the same Evidence row as the original, the version must be later. Rejected corrections cannot link a corrected version.
+
+Blockchain anchoring uses existing `recordCorrection` only after approval, and only with a confirmed original event plus corrected version. A pending `BlockchainEvent` is persisted before submission and confirmed only after a successful receipt. Failed writes remain pending and are never represented as confirmed; a matching resolution retry reuses the event and can confirm it after recovery. No new contract method was added.
+
+Passport history includes original proof/version, corrected evidence versions, resolution history, and correction proof without exposing storage paths. No Passport table was added.
 
 ## Variations (target)
 

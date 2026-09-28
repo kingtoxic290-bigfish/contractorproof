@@ -46,6 +46,12 @@ export type ProofBlockchainWriter = {
     actorId: string;
     approved: boolean;
   }): Promise<ConfirmedProof>;
+  recordCorrection(input: {
+    eventId: string;
+    previousEventId: string;
+    evidenceHash: string;
+    actorId: string;
+  }): Promise<ConfirmedProof>;
   recordDispute(input: {
     eventId: string;
     previousEventId: string;
@@ -303,6 +309,45 @@ export const proofService = {
     } catch {
       // A dispute is a valid business record even if its optional chain anchor is
       // unavailable. Return the persisted pending event without claiming proof.
+      const pending = await blockchainEventRepository.findById(event.id);
+      return toProofView(pending ?? event);
+    }
+  },
+
+  async anchorCorrection(input: {
+    correctionId: string;
+    projectId: string;
+    originalEventId: string;
+    correctedEvidenceHash: string;
+    actorId: string;
+  }): Promise<ProofView | null> {
+    const chain = writer();
+    if (!chainWritesRequired(chain)) {
+      return null;
+    }
+
+    const { event, created } = await blockchainEventRepository.createPending({
+      projectId: input.projectId,
+      eventType: BlockchainEventType.CORRECTION,
+      referenceId: input.correctionId,
+      previousEventId: input.originalEventId,
+      evidenceHash: input.correctedEvidenceHash,
+      actorId: input.actorId,
+    });
+
+    try {
+      return await confirmOrReuse({
+        event,
+        created,
+        evidenceHash: input.correctedEvidenceHash,
+        submit: () => writer().recordCorrection({
+          eventId: event.id,
+          previousEventId: input.originalEventId,
+          evidenceHash: input.correctedEvidenceHash,
+          actorId: input.actorId,
+        }),
+      });
+    } catch {
       const pending = await blockchainEventRepository.findById(event.id);
       return toProofView(pending ?? event);
     }

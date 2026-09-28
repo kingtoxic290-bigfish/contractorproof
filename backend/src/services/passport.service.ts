@@ -29,6 +29,8 @@ function projectPassport(row: PassportProjectRow) {
     blockchainProofs.find(
       (proof) => proof.eventType === eventType && proof.referenceId === referenceId,
     ) ?? null;
+  const proofById = (eventId: string) =>
+    blockchainProofs.find((proof) => proof.id === eventId) ?? null;
 
   return {
     contractor: {
@@ -102,6 +104,59 @@ function projectPassport(row: PassportProjectRow) {
           verifierRole: attestation.verifierRole,
           createdAt: attestation.createdAt.toISOString(),
           blockchainProof: proofFor(BlockchainEventType.ATTESTATION, attestation.id),
+        })),
+      })),
+      corrections: milestone.corrections.map((correction) => ({
+        id: correction.id,
+        status: correction.status,
+        reason: correction.reason,
+        createdAt: correction.createdAt.toISOString(),
+        originalRecord: {
+          eventId: correction.originalEvent.id,
+          eventType: correction.originalEvent.eventType,
+          referenceId: correction.originalEvent.referenceId,
+          evidenceVersion: correction.originalEvidenceVersion
+            ? {
+                id: correction.originalEvidenceVersion.id,
+                evidenceId: correction.originalEvidenceVersion.evidenceId,
+                versionNumber: correction.originalEvidenceVersion.versionNumber,
+                sha256: correction.originalEvidenceVersion.sha256,
+                createdAt: correction.originalEvidenceVersion.createdAt.toISOString(),
+              }
+            : null,
+          blockchainProof: proofById(correction.originalEvent.id),
+        },
+        correctedEvidence: correction.evidence
+          ? {
+              id: correction.evidence.id,
+              currentVersionId: correction.evidence.currentVersionId,
+              versions: correction.evidence.versions.map((version) => ({
+                id: version.id,
+                versionNumber: version.versionNumber,
+                sha256: version.sha256,
+                createdAt: version.createdAt.toISOString(),
+              })),
+            }
+          : null,
+        correctionProof: correction.correctionEventId
+          ? proofById(correction.correctionEventId)
+          : null,
+        resolutions: correction.resolutions.map((resolution) => ({
+          id: resolution.id,
+          status: resolution.status,
+          resolution: resolution.resolution,
+          resolvedById: resolution.resolvedById,
+          resolvedByRole: resolution.resolvedBy.role,
+          correctedEvidenceVersion: resolution.correctedEvidenceVersion
+            ? {
+                id: resolution.correctedEvidenceVersion.id,
+                evidenceId: resolution.correctedEvidenceVersion.evidenceId,
+                versionNumber: resolution.correctedEvidenceVersion.versionNumber,
+                sha256: resolution.correctedEvidenceVersion.sha256,
+                createdAt: resolution.correctedEvidenceVersion.createdAt.toISOString(),
+              }
+            : null,
+          createdAt: resolution.createdAt.toISOString(),
         })),
       })),
     })),

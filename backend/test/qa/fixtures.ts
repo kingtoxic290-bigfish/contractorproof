@@ -151,6 +151,12 @@ export async function cleanupQaUsers(): Promise<void> {
     include: { versions: true },
   });
   const evidenceIds = evidence.map((row) => row.id);
+  await prisma.correctionResolution.deleteMany({
+    where: { correction: { milestone: { project: { contractor: { userId: { in: ids } } } } } },
+  });
+  await prisma.correction.deleteMany({
+    where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
+  });
   await prisma.disputeResolution.deleteMany({
     where: { dispute: { milestone: { project: { contractor: { userId: { in: ids } } } } } },
   });
@@ -180,11 +186,11 @@ export async function cleanupQaUsers(): Promise<void> {
   await prisma.contractVariation.deleteMany({
     where: { project: { contractor: { userId: { in: ids } } } },
   });
-  await prisma.correction.deleteMany({
-    where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
-  });
   await prisma.attestation.deleteMany({
     where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
+  });
+  await prisma.blockchainEvent.deleteMany({
+    where: { project: { contractor: { userId: { in: ids } } }, eventType: "CORRECTION" },
   });
   await prisma.blockchainEvent.deleteMany({
     where: { project: { contractor: { userId: { in: ids } } } },

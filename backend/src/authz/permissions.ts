@@ -40,6 +40,7 @@ export const PERMISSIONS = {
     "CONSULTANT_ENGINEER",
     "CLIENT",
   ],
+  CORRECTION_RESOLVE: ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"],
   PROVISION_USERS: ["ADMIN"],
   AUDIT_READ: ["AUDITOR", "ADMIN", "PROCUREMENT_OFFICER"],
 } as const satisfies Record<string, readonly Role[]>;
