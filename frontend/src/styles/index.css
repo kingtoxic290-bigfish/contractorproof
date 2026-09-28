@@ -3,23 +3,80 @@
 @tailwind utilities;
 
 :root {
-  color: #1c1917;
-  background: #f5f1ea;
+  --cp-bg: #f5f3ef;
+  --cp-surface: #ffffff;
+  --cp-surface-alt: #f8f7f4;
+  --cp-border: #d6d0c8;
+  --cp-border-strong: #b8b0a6;
+  --cp-text: #1f2933;
+  --cp-text-soft: #52606d;
+  --cp-primary: #0f3d3a;
+  --cp-primary-soft: #dfeceb;
+  --cp-success: #166534;
+  --cp-success-soft: #dcfce7;
+  --cp-warning: #92400e;
+  --cp-warning-soft: #fef3c7;
+  --cp-error: #991b1b;
+  --cp-error-soft: #fee2e2;
+  --cp-info: #1d4ed8;
+  --cp-info-soft: #dbeafe;
+  color: var(--cp-text);
+  background: var(--cp-bg);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Source Sans 3", "Segoe UI", sans-serif;
+  background: var(--cp-bg);
+  color: var(--cp-text);
+  font-family: "Segoe UI", "Source Sans 3", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100vh;
 }
 
 h1,
 h2,
+h3,
+h4,
 .font-serif {
-  font-family: "Source Serif 4", Georgia, serif;
+  font-family: "Georgia", "Times New Roman", serif;
+  letter-spacing: -0.02em;
+}
+
+p,
+span,
+label,
+button,
+input,
+select,
+textarea,
+li,
+td,
+th {
+  font-family: inherit;
+}
+
+::selection {
+  background: rgba(15, 61, 58, 0.15);
 }
 
 :focus-visible {
-  outline: 2px solid #115e59;
+  outline: 2px solid var(--cp-primary);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

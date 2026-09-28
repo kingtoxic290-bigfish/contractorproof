@@ -8,18 +8,18 @@ export type NavItem = {
 };
 
 export const APP_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", hint: "Overview of your workspace" },
+  { to: "/dashboard", label: "Dashboard", hint: "Workspace overview" },
   { to: "/contractors", label: "Contractors", hint: "Registered contractor records" },
-  { to: "/projects", label: "Projects", hint: "Projects and institutional references" },
+  { to: "/projects", label: "Projects", hint: "Project and milestone references" },
   { to: "/milestones", label: "Milestones", hint: "Project milestone records" },
-  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and fingerprints" },
+  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and hashes" },
   {
     to: "/verification",
     label: "Verification",
-    hint: "Fingerprint comparison and attestations",
+    hint: "Evidence comparison and policy outcomes",
     roles: ["CONSULTANT_ENGINEER", "CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
   },
-  { to: "/passports", label: "Performance passports", hint: "Recorded project event passports" },
+  { to: "/passports", label: "Passport", hint: "Project evidence history" },
   { to: "/disputes", label: "Disputes", hint: "Open and resolved disputes" },
   { to: "/corrections", label: "Corrections", hint: "Append-only correction events" },
   { to: "/variations", label: "Variations", hint: "Linked contract variations" },

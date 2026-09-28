@@ -13,9 +13,9 @@ export function Card({
   className?: string;
 }) {
   return (
-    <section className={cn("rounded-lg border border-stone-200 bg-white p-5 shadow-sm", className)}>
-      {title ? <h2 className="font-serif text-lg text-stone-900">{title}</h2> : null}
-      {description ? <p className="mt-1 text-sm text-stone-600">{description}</p> : null}
+    <section className={cn("rounded-xl border border-stone-200 bg-white p-5 shadow-sm", className)}>
+      {title ? <h2 className="font-serif text-xl leading-tight text-stone-900">{title}</h2> : null}
+      {description ? <p className="mt-1 text-sm leading-6 text-stone-600">{description}</p> : null}
       <div className={title || description ? "mt-4" : undefined}>{children}</div>
     </section>
   );

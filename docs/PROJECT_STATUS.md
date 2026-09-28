@@ -4,35 +4,65 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ---
 
-## CURRENT TASK
-
-TASK 0 — Frontend Audit
+## TASK 1 — Frontend Design System + App Shell
 
 ## STATUS
 
 COMPLETE
 
-Frontend audit baseline captured for the React/Vite app. The initial state shows a scaffolded authenticated app shell, auth/session handling, route structure, reusable UI patterns, and a broad existing frontend test suite, but the core evidence-to-proof workflow remains partially implemented and placeholder-based. The audit baseline is summarized in `docs/FRONTEND_STATUS.md`.
+A reusable ContractorProof design system and application shell were established without changing routes, auth behavior, or backend APIs. The frontend now has a stronger visual foundation based on restrained enterprise colors, typography, spacing, card/layout primitives, navigation, status badges, and responsive shell patterns. Reusable components include `Button`, `Card`, `PageHeader`, `PageContainer`, `Section`, `Panel`, `DataTable`, and improved empty/loading/error states.
 
 TESTS:
 
-* `cd frontend && npm test -- --run` — existing frontend test suite currently passes in the baseline state (targeted suite run was not used for this audit requirement; baseline documentation reflects the actual scaffold and route coverage that already exists)
-* `cd frontend && npm run build` — not run as part of the audit-only requirement; baseline docs intentionally describe the inherited scaffold without claiming a fresh build result.
+* `cd frontend && npm test -- --run` — PASS (157/157 tests)
+* `cd frontend && npm run build` — PASS
 
 FILES CREATED:
 
-* `docs/FRONTEND_STATUS.md`
+* `frontend/src/components/ui/PageContainer.tsx`
+* `frontend/src/components/ui/Section.tsx`
+* `frontend/src/components/ui/DataTable.tsx`
+* `frontend/src/components/ui/Panel.tsx`
 
 FILES MODIFIED:
 
-* `docs/PROJECT_STATUS.md`
+* `frontend/src/styles/index.css`
+* `frontend/src/components/ui/Button.tsx`
+* `frontend/src/components/ui/Card.tsx`
+* `frontend/src/components/ui/PageHeader.tsx`
+* `frontend/src/components/ui/StatusBadge.tsx`
+* `frontend/src/components/feedback/EmptyState.tsx`
+* `frontend/src/components/feedback/LoadingState.tsx`
+* `frontend/src/components/feedback/ErrorState.tsx`
+* `frontend/src/components/layout/AppShell.tsx`
+* `frontend/src/components/layout/Header.tsx`
+* `frontend/src/components/layout/PublicLayout.tsx`
+* `frontend/src/components/layout/Sidebar.tsx`
+* `frontend/src/components/navigation/navConfig.ts`
+
+KNOWN LIMITATIONS:
+
+* This task intentionally does not implement dashboard data integration or backend feature flows; it only establishes the visual foundation and shell.
+* Future task-specific UI work should build on the new reusable primitives without altering the existing route and auth architecture.
 
 NEXT TASK:
-TASK 1 — Design System + App Shell
+TASK 2 — Authentication + API Client
 
 ---
 
-## TASK 4 — Dispute Lifecycle
+## CURRENT TASK
+
+TASK 5 — Corrections Lifecycle
+
+## STATUS
+
+COMPLETE
+
+Corrections lifecycle details and test results are recorded below.
+
+---
+
+## TASK 5 — Corrections Lifecycle
 
 ## STATUS
 
@@ -56,18 +86,19 @@ resolution history, and correction proof. No Passport table was added.
 
 Blockchain anchoring uses the existing contract `recordCorrection` method after approval only when
 the original event is confirmed and a corrected EvidenceVersion is linked. Pending rows remain
-explicitly pending after RPC/transaction/confirmation failure. No fake proof is reported, and the
-contract was not changed.
+explicitly pending after RPC/transaction/confirmation failure; a matching resolution retry reuses
+the pending event and may confirm it after recovery. No fake proof is reported, and the contract
+was not changed.
 
 TESTS:
 
-* Focused correction suite — results recorded after Task 5 verification
-* Dispute regression — pending
-* Passport regression — pending
-* Full backend — pending
-* TypeScript — pending
-* Prisma validation — pending
-* Hardhat — pending
+* Focused correction suite — 27/27 PASS
+* Dispute regression — 25/25 PASS
+* Passport regression — 8/8 PASS
+* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — 231/231 PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
+* Hardhat — 6/6 PASS; live backend Hardhat BlockchainService tests — 3/3 PASS
 
 KNOWN LIMITATIONS:
 

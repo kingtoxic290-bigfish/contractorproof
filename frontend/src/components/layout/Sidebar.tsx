@@ -6,14 +6,14 @@ export function Sidebar() {
       <div className="border-b border-stone-200 px-5 py-5">
         <p className="font-serif text-2xl text-stone-900">ContractorProof</p>
         <p className="mt-2 text-sm leading-5 text-stone-600">
-          Verifiable Contractor Performance. Trusted Project Evidence.
+          Evidence-backed verification for project records.
         </p>
       </div>
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <RoleAwareNav />
       </div>
       <p className="border-t border-stone-200 px-5 py-4 text-xs leading-5 text-stone-500">
-        Blockchain records evidence integrity. It does not prove that a construction claim is true.
+        Blockchain anchors evidence integrity; it does not validate subjective quality claims.
       </p>
     </aside>
   );

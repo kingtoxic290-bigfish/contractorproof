@@ -8,8 +8,8 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-6">
-      <p className="text-sm font-medium text-red-950">{message}</p>
+    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-6 shadow-sm">
+      <p className="text-sm font-semibold text-red-950">{message}</p>
       {onRetry ? (
         <Button type="button" variant="secondary" className="mt-3" onClick={onRetry}>
           Try again

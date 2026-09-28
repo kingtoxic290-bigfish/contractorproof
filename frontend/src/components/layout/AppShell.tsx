@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import { PageContainer } from "../ui/PageContainer";
 import { Header } from "./Header";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
@@ -20,7 +21,9 @@ export function AppShell() {
       <div className="min-w-0 flex-1">
         <Header menuOpen={menuOpen} onToggleMenu={() => setMenuOpen((open) => !open)} />
         <main id="main-content" className="px-4 py-6 lg:px-8">
-          <Outlet />
+          <PageContainer>
+            <Outlet />
+          </PageContainer>
         </main>
       </div>
     </div>

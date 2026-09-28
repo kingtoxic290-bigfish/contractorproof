@@ -1,6 +1,33 @@
-# ContractorProof — Frontend Audit Baseline
+# ContractorProof — Frontend Status
 
-## Scope
+## Task 1 state: Design system and app shell established
+
+The frontend now has a stronger foundational layout and visual system while preserving the existing route structure and current auth architecture. No backend APIs or routes were changed in this task.
+
+### Design system improvements
+
+- Restrained enterprise palette centered on stone, slate, and deep teal accents.
+- Consistent typography hierarchy with serif page headings and clear sans-serif body text.
+- Consistent spacing and card styling across the main shell and reusable primitives.
+- Standardized status treatment for verification states using semantic labeling and visible color + indicator treatment.
+- Reusable `Button`, `Card`, `PageHeader`, `Section`, `Panel`, and `DataTable` patterns.
+
+### Application shell improvements
+
+- Updated the authenticated shell with a full-width page container, header, responsive navigation, branded sidebar copy, and stronger page framing.
+- Kept the current router and role-aware navigation structure intact.
+- Improved mobile navigation and focus/keyboard accessibility.
+- Added a more explicit public layout for verification and unauthenticated entry points.
+
+### Current limitations
+
+- The shell is a presentation foundation only; no live dashboard or feature data integration has been added.
+- Placeholder screens remain placeholder screens, but their empty-state presentation is now consistent with the design system.
+- Task 2 will handle the actual frontend auth and API-client integration work.
+
+---
+
+## Baseline audit summary
 
 This audit covers the current React + Vite frontend in `frontend/` before any redesign work begins. The objective is to establish a truthful baseline of what is implemented, what is wired to the backend, and what remains placeholder behavior.
 
