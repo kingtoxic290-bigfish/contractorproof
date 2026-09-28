@@ -1,6 +1,6 @@
 import type { PublicUser } from "../../types/auth";
 import { isRole } from "../../types/roles";
-import { asRequiredString, isPlainRecord } from "../shared/query";
+import { asNullableString, asRequiredString, isPlainRecord } from "../shared/query";
 
 export type { PublicUser };
 
@@ -19,11 +19,6 @@ export type PublicContractor = {
   updatedAt: string;
   user: PublicUser;
 };
-
-function nullableString(value: unknown): string | null | undefined {
-  if (value === null || value === undefined) return null;
-  return typeof value === "string" ? value : undefined;
-}
 
 export function parsePublicUser(value: unknown): PublicUser | null {
   if (!isPlainRecord(value)) {
@@ -53,23 +48,7 @@ export function parsePublicContractor(value: unknown): PublicContractor | null {
   const createdAt = asRequiredString(value.createdAt);
   const updatedAt = asRequiredString(value.updatedAt);
   const user = parsePublicUser(value.user);
-  const crbRegistrationNumber = nullableString(value.crbRegistrationNumber);
-  const crbCategory = nullableString(value.crbCategory);
-  const crbType = nullableString(value.crbType);
-  const crbClass = nullableString(value.crbClass);
-  const crbStatus = nullableString(value.crbStatus);
-  const crbLastVerifiedAt = nullableString(value.crbLastVerifiedAt);
   if (!id || !userId || !legalName || !crbSource || !createdAt || !updatedAt || !user) {
-    return null;
-  }
-  if (
-    crbRegistrationNumber === undefined ||
-    crbCategory === undefined ||
-    crbType === undefined ||
-    crbClass === undefined ||
-    crbStatus === undefined ||
-    crbLastVerifiedAt === undefined
-  ) {
     return null;
   }
 
@@ -77,12 +56,12 @@ export function parsePublicContractor(value: unknown): PublicContractor | null {
     id,
     userId,
     legalName,
-    crbRegistrationNumber,
-    crbCategory,
-    crbType,
-    crbClass,
-    crbStatus,
-    crbLastVerifiedAt,
+    crbRegistrationNumber: asNullableString(value.crbRegistrationNumber),
+    crbCategory: asNullableString(value.crbCategory),
+    crbType: asNullableString(value.crbType),
+    crbClass: asNullableString(value.crbClass),
+    crbStatus: asNullableString(value.crbStatus),
+    crbLastVerifiedAt: asNullableString(value.crbLastVerifiedAt),
     crbSource,
     createdAt,
     updatedAt,

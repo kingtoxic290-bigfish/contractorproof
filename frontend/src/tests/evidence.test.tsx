@@ -3,8 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   listEvidence,
-  listEvidenceByMilestone,
-  listEvidenceByProject,
   uploadEvidence,
 } from "../features/evidence/api/evidenceApi";
 import { getMilestone, listProjectMilestones } from "../features/milestones/api/milestonesApi";

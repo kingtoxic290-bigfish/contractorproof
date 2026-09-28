@@ -27,6 +27,20 @@ The protected `/dashboard` route now renders an operational overview from the au
 - Desktop and 390px browser previews rendered without horizontal page overflow. No local backend was listening on port 4000, so live database-backed smoke testing could not be performed.
 - Proof details, passport variations/corrections, and backend verification rows are limited to fields returned by the current passport projection; no direct blockchain-event list or standalone verification-results list is available.
 
+## Task 5 state: Milestones and evidence workflow wired to the real backend
+
+The protected project → milestone → evidence workflow now uses the existing authenticated backend contracts. Project pages list project-scoped milestones; milestone detail uses `GET /api/v1/milestones/:milestoneId` and lists its accessible evidence through `GET /api/v1/evidence?milestoneId=...`.
+
+- The standalone milestone page loads `GET /api/v1/projects/:projectId/milestones`; list and detail use shared loading, empty, error, 401, 403, and 404 states.
+- Evidence can be filtered with the backend's `projectId` and `milestoneId` query parameters. Invalid client-side identifiers show an error and never fall back to an unfiltered request.
+- Upload sends the backend-required multipart `milestoneId` and `file` fields. A successful result refreshes the active evidence list. The UI only displays the backend-returned filename, metadata, workflow/comparison states, current-version information, and full SHA-256 fingerprint; it includes a copy action for that fingerprint.
+- Upload is explicitly not presented as verification or blockchain confirmation. Backend values remain authoritative, including `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE` where returned.
+- Evidence responses never display storage references, filesystem paths, or backend-only fields.
+
+### Current backend limitation
+
+The current HTTP API returns only `currentVersion` in evidence list/create DTOs. Although the backend service has version operations, no evidence detail or version-history HTTP endpoint is mounted. The frontend therefore shows the returned current version and does not claim to show a complete append-only history or fabricate older versions.
+
 ## Task 4 state: Contractors + projects workflow wired to the real backend
 
 The contractor and project feature flows now use the actual backend contracts instead of placeholder or synthetic records. Contractor list/detail views use the authenticated `GET /api/v1/contractors` and `GET /api/v1/contractors/:contractorId` endpoints; project list/detail views use `GET /api/v1/projects` and `GET /api/v1/projects/:projectId`. The create-project form uses the real `POST /api/v1/projects` contract and respects the backend enrollment rules: only `CONTRACTOR` and `ADMIN` can reach the create page, while the backend remains the source of truth for validation and ownership checks.
@@ -309,3 +323,9 @@ It does not yet have:
 - end-to-end evidence-to-proof narrative matching the backend contract.
 
 This is an appropriate starting baseline for Task 1, which is to establish a consistent design system and app shell without redesigning the backend or inventing unsupported functionality.
+
+## Task 6 state: Internal verification UI wired to the real backend
+
+The protected verification page uses `POST /api/v1/verification` only. It accepts backend-defined evidence IDs, sending JSON for stored-byte comparison or multipart `file` data for presented-file comparison. It validates `{ data: { verification, proof }, meta }`, preserves only `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`, and shows the backend SHA-256 with a copy action.
+
+Requests clear prior results while verifying. Safe handling covers 400, 401, 403, 404, 409, server, and network errors; no internal paths, provider details, database errors, or secrets are shown. There is no verification-history endpoint, so none is fabricated. Returned proof metadata is limited to `CONFIRMED`, `PENDING`, or `NO PROOF`; detailed proof presentation is deferred to Task 7.

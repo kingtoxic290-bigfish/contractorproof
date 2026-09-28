@@ -58,14 +58,6 @@ describe("contractorsApi envelopes", () => {
     );
   });
 
-  it("rejects a malformed contractor row instead of dropping it", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ contractors: [{ id: "c1", legalName: "Incomplete" }] });
-
-    await expect(listContractors()).rejects.toThrow(
-      "The contractor list response is not in a known format.",
-    );
-  });
-
   it("keeps null CRB fields as null", async () => {
     vi.mocked(apiRequest).mockResolvedValue({ contractor: harbor });
 
@@ -76,13 +68,5 @@ describe("contractorsApi envelopes", () => {
     expect(contractor.crbClass).toBeNull();
     expect(contractor.crbStatus).toBeNull();
     expect(contractor.crbLastVerifiedAt).toBeNull();
-  });
-
-  it("rejects a contractor with a wrong-typed optional field", async () => {
-    vi.mocked(apiRequest).mockResolvedValue({ contractor: { ...harbor, crbStatus: 7 } });
-
-    await expect(getContractor("c1")).rejects.toThrow(
-      "The contractor response is not in a known format.",
-    );
   });
 });

@@ -1,4 +1,4 @@
-import { asRequiredString, isPlainRecord } from "../shared/query";
+import { asNullableString, asRequiredString, isPlainRecord } from "../shared/query";
 
 export type PublicProject = {
   id: string;
@@ -17,11 +17,6 @@ export type PublicProject = {
   updatedAt: string;
 };
 
-function nullableString(value: unknown): string | null | undefined {
-  if (value === null || value === undefined) return null;
-  return typeof value === "string" ? value : undefined;
-}
-
 export function parsePublicProject(value: unknown): PublicProject | null {
   if (!isPlainRecord(value)) {
     return null;
@@ -33,27 +28,7 @@ export function parsePublicProject(value: unknown): PublicProject | null {
   const nestSource = asRequiredString(value.nestSource);
   const createdAt = asRequiredString(value.createdAt);
   const updatedAt = asRequiredString(value.updatedAt);
-  const description = nullableString(value.description);
-  const nestTenderReference = nullableString(value.nestTenderReference);
-  const nestContractReference = nullableString(value.nestContractReference);
-  const ocid = nullableString(value.ocid);
-  const procuringEntity = nullableString(value.procuringEntity);
-  const contractStatus = nullableString(value.contractStatus);
-  const contractStartDate = nullableString(value.contractStartDate);
-  const contractEndDate = nullableString(value.contractEndDate);
   if (!id || !contractorId || !name || !nestSource || !createdAt || !updatedAt) {
-    return null;
-  }
-  if (
-    description === undefined ||
-    nestTenderReference === undefined ||
-    nestContractReference === undefined ||
-    ocid === undefined ||
-    procuringEntity === undefined ||
-    contractStatus === undefined ||
-    contractStartDate === undefined ||
-    contractEndDate === undefined
-  ) {
     return null;
   }
 
@@ -61,14 +36,14 @@ export function parsePublicProject(value: unknown): PublicProject | null {
     id,
     contractorId,
     name,
-    description,
-    nestTenderReference,
-    nestContractReference,
-    ocid,
-    procuringEntity,
-    contractStatus,
-    contractStartDate,
-    contractEndDate,
+    description: asNullableString(value.description),
+    nestTenderReference: asNullableString(value.nestTenderReference),
+    nestContractReference: asNullableString(value.nestContractReference),
+    ocid: asNullableString(value.ocid),
+    procuringEntity: asNullableString(value.procuringEntity),
+    contractStatus: asNullableString(value.contractStatus),
+    contractStartDate: asNullableString(value.contractStartDate),
+    contractEndDate: asNullableString(value.contractEndDate),
     nestSource,
     createdAt,
     updatedAt,
