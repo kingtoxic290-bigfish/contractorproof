@@ -98,6 +98,19 @@ export function projectListWhere(actor: PublicUser): Prisma.ProjectWhereInput {
   return { id: { in: [] } };
 }
 
+/** SQL where-clause for blockchain proof history, scoped exactly like projects. */
+export function blockchainEventListWhere(
+  actor: PublicUser,
+  filters: { projectId?: string } = {},
+): Prisma.BlockchainEventWhereInput {
+  const project = projectListWhere(actor);
+  const clauses: Prisma.BlockchainEventWhereInput[] = [{ project }];
+  if (filters.projectId) {
+    clauses.push({ projectId: filters.projectId });
+  }
+  return clauses.length === 1 ? clauses[0] : { AND: clauses };
+}
+
 /**
  * SQL where-clause for GET /contractors. Same matrix as project list.
  */

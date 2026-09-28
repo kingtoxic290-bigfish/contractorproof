@@ -285,6 +285,41 @@ Not a trust score. No Passport table.
 
 ---
 
+## Blockchain proof history and reconciliation
+
+### GET `/api/v1/blockchain`
+
+Auth: JWT. Optional query: `projectId` (UUID).
+
+The result is scoped through the existing project-read rules: a contractor sees only its own project events; ADMIN, AUDITOR, and PROCUREMENT_OFFICER may read authorized projects. An explicitly requested unknown project returns the established 404; inaccessible projects return 403. No evidence-id lookup is provided.
+
+```json
+{
+  "data": {
+    "events": [{
+      "id": "uuid",
+      "projectId": "uuid",
+      "eventType": "VERIFICATION",
+      "referenceId": "uuid-or-null",
+      "txHash": "0x...",
+      "blockNumber": 123,
+      "confirmationState": "CONFIRMED",
+      "createdAt": "2026-09-28T00:00:00.000Z",
+      "recordedAt": "2026-09-28T00:00:00.000Z"
+    }]
+  },
+  "meta": {}
+}
+```
+
+### POST `/api/v1/blockchain/:eventId/reconcile`
+
+Auth: JWT with the same project-read authorization. Reconciles only the existing transaction hash. A successful receipt with a positive block number confirms the existing event; an unavailable/reverted receipt, provider error, or missing hash returns the same event as `PENDING`. It never creates or resubmits a blockchain transaction, and an already confirmed row is returned unchanged. The model has no separate failed state.
+
+Never returned: signer/private key material, RPC configuration, provider internals, storage paths, evidence contents, or unrelated project records.
+
+---
+
 ## Public verification (implemented HTTP)
 
 Agent 7 still owns Passport presentation. This POST is the unauthenticated compare adapter.

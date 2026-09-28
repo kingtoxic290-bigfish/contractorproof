@@ -127,6 +127,28 @@ export class BlockchainService {
     return Boolean(await contract.projectExists(this.encodeId(projectId, "projectId")));
   }
 
+  /**
+   * Read an already-submitted transaction only. This never submits or retries a
+   * transaction, so callers can safely reconcile a persisted pending event.
+   */
+  async getSuccessfulTransactionReceipt(
+    txHash: string,
+  ): Promise<{ txHash: string; blockNumber: number } | null> {
+    try {
+      const receipt = await this.provider.getTransactionReceipt(txHash);
+      const blockNumber = receipt ? Number(receipt.blockNumber) : 0;
+      if (!receipt || receipt.status !== 1 || !Number.isFinite(blockNumber) || blockNumber <= 0) {
+        return null;
+      }
+      return { txHash: receipt.hash, blockNumber };
+    } catch {
+      throw new BlockchainError(
+        BLOCKCHAIN_ERROR_CODES.PROVIDER_FAILURE,
+        "blockchain provider is unavailable",
+      );
+    }
+  }
+
   async assertReadyForWrites(): Promise<void> {
     this.assertConfigured();
     if (!this.config.privateKey) {

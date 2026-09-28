@@ -71,4 +71,27 @@ describe("BlockchainService failure handling (no live RPC required)", () => {
       actorId: randomUUID(),
     })).rejects.toMatchObject({ code: BLOCKCHAIN_ERROR_CODES.PROVIDER_FAILURE });
   });
+
+  it("reads receipts conservatively for reconciliation without submitting a transaction", async () => {
+    const chain = new BlockchainService(
+      { contractAddress: "0x00000000000000000000000000000000000000cd" },
+      {
+        getTransactionReceipt: async () => ({
+          hash: "0xconfirmed",
+          status: 1,
+          blockNumber: 19n,
+        }),
+      } as never,
+    );
+    await expect(chain.getSuccessfulTransactionReceipt("0xpending")).resolves.toEqual({
+      txHash: "0xconfirmed",
+      blockNumber: 19,
+    });
+
+    const reverted = new BlockchainService(
+      { contractAddress: "0x00000000000000000000000000000000000000cd" },
+      { getTransactionReceipt: async () => ({ hash: "0xreverted", status: 0, blockNumber: 20n }) } as never,
+    );
+    await expect(reverted.getSuccessfulTransactionReceipt("0xreverted")).resolves.toBeNull();
+  });
 });

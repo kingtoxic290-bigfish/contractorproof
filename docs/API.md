@@ -28,6 +28,8 @@ Base path: `/api/v1`. Frontend origin env: `VITE_API_ORIGIN`.
 | GET | `/api/v1/disputes` | JWT | Working |
 | POST | `/api/v1/corrections` | JWT | Working |
 | GET | `/api/v1/corrections` | JWT | Working |
+| GET | `/api/v1/blockchain` | JWT | Authorized proof history |
+| POST | `/api/v1/blockchain/:eventId/reconcile` | JWT | Receipt-only reconciliation |
 | GET | `/api/v1/public/verify` | No | Public verification usage and state explanation |
 | POST | `/api/v1/public/verify` | No | Public file comparison against confirmed verification proof |
 
@@ -468,8 +470,10 @@ Routes: `GET /api/v1/variations?projectId=uuid`, `GET /api/v1/variations/:variat
 
 The contract already supports `recordVariation`. When a writable registry is configured, approved variations with a confirmed source event create a pending `BlockchainEvent` before submission and confirm only after a successful receipt. Failures remain pending and identical approval retries reuse the logical event. An unconfirmed source or unavailable registry creates no variation proof. Passport exposes original/proposed snapshots, decisions, and proof state.
 
-## Stubs (501)
+## Blockchain proof history and reconciliation
 
-GET blockchain.
+`GET /api/v1/blockchain?projectId=<uuid>` returns safe event metadata only for projects readable by the JWT actor. Contractors are limited to their own projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER use existing privileged project-read access.
+
+`POST /api/v1/blockchain/:eventId/reconcile` inspects only the receipt for an already-stored transaction hash. A successful receipt with a positive block number confirms that same row. Reverted/unavailable receipts, provider errors, and events without a transaction hash remain pending. It never submits a transaction or overwrites a confirmed event.
 
 Public POST verify requires a confirmed `VERIFICATION` proof before returning MATCH or MISMATCH. Pending/unconfirmed proof returns PENDING; missing or inconsistent proof returns UNAVAILABLE. MATCH establishes fingerprint integrity only and does not prove the underlying construction claim.

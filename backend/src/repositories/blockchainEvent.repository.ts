@@ -86,6 +86,13 @@ export const blockchainEventRepository = {
     });
   },
 
+  list(where: Prisma.BlockchainEventWhereInput): Promise<BlockchainEvent[]> {
+    return prisma.blockchainEvent.findMany({
+      where,
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+  },
+
   /**
    * Insert a pending event (txHash null). On unique conflict, returns the existing row
    * so callers can treat retries as idempotent rather than creating duplicates.
