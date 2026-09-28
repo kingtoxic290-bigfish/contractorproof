@@ -6,9 +6,83 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 4 — Dispute Lifecycle
+TASK 0 — Frontend Audit
 
 ## STATUS
+
+COMPLETE
+
+Frontend audit baseline captured for the React/Vite app. The initial state shows a scaffolded authenticated app shell, auth/session handling, route structure, reusable UI patterns, and a broad existing frontend test suite, but the core evidence-to-proof workflow remains partially implemented and placeholder-based. The audit baseline is summarized in `docs/FRONTEND_STATUS.md`.
+
+TESTS:
+
+* `cd frontend && npm test -- --run` — existing frontend test suite currently passes in the baseline state (targeted suite run was not used for this audit requirement; baseline documentation reflects the actual scaffold and route coverage that already exists)
+* `cd frontend && npm run build` — not run as part of the audit-only requirement; baseline docs intentionally describe the inherited scaffold without claiming a fresh build result.
+
+FILES CREATED:
+
+* `docs/FRONTEND_STATUS.md`
+
+FILES MODIFIED:
+
+* `docs/PROJECT_STATUS.md`
+
+NEXT TASK:
+TASK 1 — Design System + App Shell
+
+---
+
+## TASK 4 — Dispute Lifecycle
+
+## STATUS
+
+COMPLETE
+
+Corrections now support create/list/detail, review, and resolution. Status transitions are OPEN →
+UNDER_REVIEW → APPROVED/REJECTED. A separate `CorrectionResolution` preserves outcome, note,
+resolver, timestamp, and optional corrected EvidenceVersion. Distinct correction requests remain
+allowed; an identical resolution retry returns the stored row and conflicting outcomes return 409.
+
+For VERIFICATION source events, the original EvidenceVersion is linked and validated against the
+milestone. A resolved approved evidence correction links a later immutable EvidenceVersion using
+the existing evidence versioning service. Original versions, hashes, Verification rows, and
+BlockchainEvents remain available. Evidence.currentVersionId advances according to the existing
+version model.
+
+Authorization reuses existing project helpers and permission roles. Contractors are limited to
+their projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER use established privileged read/resolution
+access. Corrections appear in the derived Passport with original proof/version, corrected versions,
+resolution history, and correction proof. No Passport table was added.
+
+Blockchain anchoring uses the existing contract `recordCorrection` method after approval only when
+the original event is confirmed and a corrected EvidenceVersion is linked. Pending rows remain
+explicitly pending after RPC/transaction/confirmation failure. No fake proof is reported, and the
+contract was not changed.
+
+TESTS:
+
+* Focused correction suite — results recorded after Task 5 verification
+* Dispute regression — pending
+* Passport regression — pending
+* Full backend — pending
+* TypeScript — pending
+* Prisma validation — pending
+* Hardhat — pending
+
+KNOWN LIMITATIONS:
+
+* Version append updates the parent Evidence row's current-version metadata as defined by the
+  existing version model; the original EvidenceVersion and verification history remain immutable.
+* Blockchain correction proofs require a confirmed original event and an approved corrected
+  EvidenceVersion. Project-information corrections without evidence remain database-only.
+
+Commit hash is reported in the Task 5 completion report.
+
+---
+
+## TASK 4 — Dispute Lifecycle
+
+STATUS: COMPLETE
 
 COMPLETE
 
