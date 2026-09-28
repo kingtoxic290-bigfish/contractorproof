@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listEvidence } from "../features/evidence/api/evidenceApi";
 import { createAttestation } from "../features/verification/api/attestationApi";
 import { createVerification } from "../features/verification/api/verificationApi";
+import { listVerificationHistory, type VerificationHistoryEntry } from "../features/verification/api/verificationHistoryApi";
 import { authApi } from "../services/api/auth";
 import { ApiError } from "../services/api/errors";
 import {
@@ -28,6 +29,10 @@ vi.mock("../features/evidence/api/evidenceApi", () => ({
 
 vi.mock("../features/verification/api/verificationApi", () => ({
   createVerification: vi.fn(),
+}));
+
+vi.mock("../features/verification/api/verificationHistoryApi", () => ({
+  listVerificationHistory: vi.fn(),
 }));
 
 vi.mock("../features/verification/api/attestationApi", () => ({
@@ -55,6 +60,32 @@ const pending = evidenceRecord({
     createdAt: "2026-09-24T07:49:43.000Z",
   },
 });
+const historicalMatch: VerificationHistoryEntry = {
+  verification: {
+    id: "history-1",
+    status: "MATCH",
+    source: "INTERNAL",
+    createdAt: "2026-09-25T10:00:00.000Z",
+  },
+  projectId: "project-1",
+  projectName: "Bridge deck",
+  milestoneId,
+  milestoneName: "Foundation",
+  evidenceId,
+  evidenceVersionId: versionId,
+  versionNumber: 1,
+  sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  proof: {
+    id: "proof-1",
+    eventType: "VERIFICATION",
+    referenceId: versionId,
+    txHash: "0xconfirmed-proof",
+    blockNumber: 42,
+    confirmationState: "CONFIRMED",
+    confirmed: true,
+    createdAt: "2026-09-25T10:01:00.000Z",
+  },
+};
 
 function mockAuditor() {
   seedSession();
@@ -79,6 +110,7 @@ describe("verification page", () => {
   beforeEach(() => {
     mockAuditor();
     vi.mocked(listEvidence).mockResolvedValue([pending]);
+    vi.mocked(listVerificationHistory).mockResolvedValue([]);
     vi.mocked(createVerification).mockReset();
     vi.mocked(createAttestation).mockReset();
   });
@@ -87,6 +119,13 @@ describe("verification page", () => {
     vi.mocked(listEvidence).mockReturnValue(new Promise(() => undefined));
     renderApp("/verification");
     expect(await screen.findByText("Loading evidence for review...")).toBeInTheDocument();
+  });
+
+  it("shows the backend-backed empty review queue", async () => {
+    vi.mocked(listEvidence).mockResolvedValue([]);
+    renderApp("/verification");
+    expect(await screen.findByText("No evidence available to review.")).toBeInTheDocument();
+    expect(createVerification).not.toHaveBeenCalled();
   });
 
   it("lists evidence for an authorized verifier without treating upload as verification", async () => {
@@ -130,13 +169,140 @@ describe("verification page", () => {
     expect(
       screen.getByText(/does not mean the blockchain independently proves/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("Status: Blockchain proof unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Status: NO PROOF")).toBeInTheDocument();
     expect(screen.queryByText("Status: Anchored")).not.toBeInTheDocument();
     expect(createVerification).toHaveBeenCalledWith({
       evidenceId,
       evidenceVersionId: pending.currentVersionId,
       file: undefined,
     });
+  });
+
+  it("shows the backend SHA-256 and copies that exact value", async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    vi.mocked(createVerification).mockResolvedValue(verificationRecord({ status: "MATCH" }));
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+
+    expect((await screen.findAllByText(verificationRecord({ status: "MATCH" }).sha256!)).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole("button", { name: "Copy SHA-256" }));
+    expect(writeText).toHaveBeenCalledWith(verificationRecord({ status: "MATCH" }).sha256);
+    expect(await screen.findByText("SHA-256 copied.")).toBeInTheDocument();
+  });
+
+  it("clears a stale MATCH while a new verification is in progress", async () => {
+    vi.mocked(createVerification).mockResolvedValueOnce(verificationRecord({ status: "MATCH" }));
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("MATCH")).toBeInTheDocument();
+
+    let resolveRequest: (value: ReturnType<typeof verificationRecord>) => void = () => undefined;
+    vi.mocked(createVerification).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveRequest = resolve; }),
+    );
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("VERIFYING EVIDENCE")).toBeInTheDocument();
+    expect(screen.queryByText("MATCH")).not.toBeInTheDocument();
+
+    resolveRequest(verificationRecord({ status: "UNAVAILABLE" }));
+    expect(await screen.findByText("UNAVAILABLE")).toBeInTheDocument();
+  });
+
+  it("shows minimal confirmed proof state returned with a MATCH", async () => {
+    vi.mocked(createVerification).mockResolvedValue(
+      verificationRecord({
+        status: "MATCH",
+        proof: {
+          id: "proof-1",
+          eventType: "VERIFICATION",
+          txHash: "0xabc",
+          blockNumber: 42,
+          evidenceHash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("Status: CONFIRMED")).toBeInTheDocument();
+    expect(screen.getByText("VERIFICATION")).toBeInTheDocument();
+    expect(screen.getByText("0xabc")).toBeInTheDocument();
+    expect(screen.getAllByText("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    [{ txHash: "0xpending", blockNumber: null }, "0xpending", "Not confirmed"],
+    [{ txHash: null, blockNumber: 42 }, "Not provided", "42"],
+    [{ txHash: "0xzero", blockNumber: 0 }, "0xzero", "0"],
+  ])("does not present partial proof metadata as confirmed", async (proof, txLabel, blockLabel) => {
+    vi.mocked(createVerification).mockResolvedValue(
+      verificationRecord({ status: "MATCH", proof: { ...historicalMatch.proof!, ...proof } }),
+    );
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("Status: PENDING")).toBeInTheDocument();
+    expect(screen.getAllByText(txLabel).length).toBeGreaterThan(0);
+    expect(screen.getByText(blockLabel)).toBeInTheDocument();
+    expect(screen.queryByText("Status: CONFIRMED")).not.toBeInTheDocument();
+  });
+
+  it("renders persisted verification history with project, milestone, version, and confirmed proof context", async () => {
+    vi.mocked(listVerificationHistory).mockResolvedValue([historicalMatch]);
+    renderApp(reviewPath());
+
+    expect(await screen.findByText("Persisted verification history")).toBeInTheDocument();
+    expect(screen.getByText("Bridge deck")).toBeInTheDocument();
+    expect(screen.getByText("Foundation")).toBeInTheDocument();
+    expect(screen.getByText("history-1")).toBeInTheDocument();
+    expect(screen.getByText("CONFIRMED")).toBeInTheDocument();
+    expect(screen.getByText("0xconfirmed-proof")).toBeInTheDocument();
+  });
+
+  it("shows no-history empty state for a selected evidence context", async () => {
+    renderApp(reviewPath());
+    expect(await screen.findByText("No verification results yet.")).toBeInTheDocument();
+  });
+
+  it("shows a loading state while the persisted verification projection loads", async () => {
+    vi.mocked(listVerificationHistory).mockReturnValue(new Promise(() => undefined));
+    renderApp(reviewPath());
+    expect(await screen.findByText("Loading persisted verification history...")).toBeInTheDocument();
+  });
+
+  it("shows malformed persisted history as an explicit data error", async () => {
+    vi.mocked(listVerificationHistory).mockRejectedValue(
+      new Error("The dashboard response is not in a known format."),
+    );
+    renderApp(reviewPath());
+    expect(await screen.findByText("The dashboard response is not in a known format.")).toBeInTheDocument();
+  });
+
+  it("shows malformed verification submission responses instead of a generic success or empty result", async () => {
+    vi.mocked(createVerification).mockRejectedValue(
+      new Error("The verification response is not in a known format."),
+    );
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("The verification response is not in a known format.")).toBeInTheDocument();
   });
 
   it("keeps MISMATCH visually and semantically distinct", async () => {
@@ -149,8 +315,8 @@ describe("verification page", () => {
 
     expect(await screen.findByText("MISMATCH")).toBeInTheDocument();
     expect(
-      screen.getByText(/does not match the expected integrity record/i),
-    ).toBeInTheDocument();
+      screen.getAllByText(/does not match the recorded evidence fingerprint/i).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText(/fraud|fake|fraudulent/i)).not.toBeInTheDocument();
     expect(screen.queryByText("MATCH")).not.toBeInTheDocument();
   });
@@ -245,6 +411,28 @@ describe("verification page", () => {
     expect(screen.getByText("insufficient permission")).toBeInTheDocument();
   });
 
+  it("shows an authentication problem when compare is rejected with 401", async () => {
+    vi.mocked(createVerification).mockRejectedValue(new ApiError(401, "missing bearer token"));
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("Unauthorized")).toBeInTheDocument();
+    expect(screen.getByText("You need to sign in to verify this evidence.")).toBeInTheDocument();
+  });
+
+  it("shows a safe validation message for a 400 compare error", async () => {
+    vi.mocked(createVerification).mockRejectedValue(new ApiError(400, "evidenceId or evidenceVersionId is required"));
+    const user = userEvent.setup();
+    renderApp(reviewPath());
+    await readyToReview();
+    await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
+    await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
+    expect(await screen.findByText("Validation")).toBeInTheDocument();
+    expect(screen.getByText("evidenceId or evidenceVersionId is required")).toBeInTheDocument();
+  });
+
   it("handles a missing record on compare", async () => {
     vi.mocked(createVerification).mockRejectedValue(
       new ApiError(404, "evidence not found", undefined, "EVIDENCE_NOT_FOUND"),
@@ -291,6 +479,7 @@ describe("verification page", () => {
     await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+    expect(screen.queryByText("internal server error")).not.toBeInTheDocument();
   });
 
   it("handles a temporary outage on the review queue", async () => {

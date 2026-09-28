@@ -91,6 +91,7 @@ export function verificationRecord(
     evidenceVersionId: "version-e1",
     sha256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     createdAt: "2026-09-24T07:49:43.000Z",
+    proof: null,
     ...overrides,
   };
 }

@@ -127,7 +127,7 @@ export function VerificationCompare({
       </form>
 
       <div className="mt-4 space-y-3">
-        {phase === "submitting" ? <LoadingState message="Recording fingerprint comparison..." /> : null}
+        {phase === "submitting" ? <LoadingState message="VERIFYING EVIDENCE" /> : null}
         <ActionError
           phase={phase}
           error={error}

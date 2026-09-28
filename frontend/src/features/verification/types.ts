@@ -34,12 +34,22 @@ export type AttestationDecision = (typeof ATTESTATION_DECISIONS)[number];
 
 export type PublicVerification = {
   id: string | null;
-  status: string;
-  source: string;
+  status: VerificationStatus;
+  source: "INTERNAL";
   evidenceId: string | null;
   evidenceVersionId: string | null;
   sha256: string | null;
   createdAt: string | null;
+  proof: PublicVerificationProof | null;
+};
+
+/** Minimal proof metadata returned alongside an internal verification result. */
+export type PublicVerificationProof = {
+  id: string;
+  eventType: string;
+  txHash: string | null;
+  blockNumber: number | null;
+  evidenceHash: string | null;
 };
 
 export type PublicAttestation = {
@@ -67,7 +77,7 @@ export const VERIFICATION_STATUS_MEANING: Record<VerificationStatus, string> = {
 };
 
 export const MISMATCH_EXPLANATION =
-  "The evidence fingerprint does not match the expected integrity record. This is an integrity mismatch, not a determination of why the bytes differ.";
+  "The submitted file does not match the recorded evidence fingerprint. This is a technical comparison result and does not establish why the bytes differ.";
 
 export type ActionPhase =
   | "ready"
@@ -98,21 +108,84 @@ export function parsePublicVerification(value: unknown): PublicVerification | nu
     return null;
   }
 
-  const status = asRequiredString(value.status);
-  const source = asRequiredString(value.source);
-  if (!status || !source) {
+  const status = value.status;
+  const id = nullableStringField(value, "id");
+  const source = value.source;
+  const evidenceId = nullableStringField(value, "evidenceId");
+  const evidenceVersionId = nullableStringField(value, "evidenceVersionId");
+  const sha256 = nullableStringField(value, "sha256");
+  const createdAt = nullableTimestampField(value, "createdAt");
+  if (
+    typeof status !== "string" ||
+    !isVerificationStatus(status) ||
+    source !== "INTERNAL" ||
+    id === undefined ||
+    evidenceId === undefined ||
+    evidenceVersionId === undefined ||
+    sha256 === undefined ||
+    (sha256 !== null && !isSha256(sha256)) ||
+    createdAt === undefined
+  ) {
     return null;
   }
 
   return {
-    id: asNullableString(value.id),
+    id,
     status,
     source,
-    evidenceId: asNullableString(value.evidenceId),
-    evidenceVersionId: asNullableString(value.evidenceVersionId),
-    sha256: asNullableString(value.sha256),
-    createdAt: asNullableString(value.createdAt),
+    evidenceId,
+    evidenceVersionId,
+    sha256,
+    createdAt,
+    proof: null,
   };
+}
+
+export function parsePublicVerificationProof(value: unknown): PublicVerificationProof | null {
+  if (!isPlainRecord(value)) {
+    return null;
+  }
+  const id = asRequiredString(value.id);
+  const eventType = value.eventType;
+  const txHash = nullableStringField(value, "txHash");
+  const evidenceHash = nullableStringField(value, "evidenceHash");
+  const blockNumber =
+    value.blockNumber === null
+      ? null
+      : typeof value.blockNumber === "number" && Number.isSafeInteger(value.blockNumber)
+        ? value.blockNumber
+        : undefined;
+  if (
+    !id ||
+    eventType !== "VERIFICATION" ||
+    txHash === undefined ||
+    evidenceHash === undefined ||
+    blockNumber === undefined ||
+    (blockNumber !== null && blockNumber < 0) ||
+    (evidenceHash !== null && !isSha256(evidenceHash))
+  ) {
+    return null;
+  }
+  return { id, eventType, txHash, blockNumber, evidenceHash };
+}
+
+function nullableStringField(record: Record<string, unknown>, key: string): string | null | undefined {
+  if (!(key in record)) return undefined;
+  const value = record[key];
+  return value === null || (typeof value === "string" && value.length > 0) ? value : undefined;
+}
+
+function nullableTimestampField(
+  record: Record<string, unknown>,
+  key: string,
+): string | null | undefined {
+  const value = nullableStringField(record, key);
+  if (value === null || value === undefined) return value;
+  return Number.isFinite(Date.parse(value)) ? value : undefined;
+}
+
+function isSha256(value: string): boolean {
+  return /^[0-9a-f]{64}$/.test(value);
 }
 
 export function parsePublicAttestation(value: unknown): PublicAttestation | null {
@@ -166,6 +239,9 @@ export function phaseFromActionError(error: unknown): ActionPhase {
 }
 
 export function verificationActionMessage(error: unknown): string {
+  if (error instanceof Error && error.message.includes("not in a known format")) {
+    return error.message;
+  }
   if (error instanceof ApiError) {
     if (error.isUnauthorized) {
       return "You need to sign in to verify this evidence.";

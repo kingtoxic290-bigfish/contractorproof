@@ -108,6 +108,35 @@ TASK 6 STATUS: NOT STARTED.
 
 ---
 
+## AGENT 2 TASK 6 — Verification Frontend Workflow
+
+## STATUS
+
+COMPLETE
+
+The protected verification UI submits internal comparisons through the existing authenticated `POST /api/v1/verification` route. It sends `evidenceId` and/or `evidenceVersionId` as JSON for a stored-byte comparison, or the same references plus optional multipart `file` for a presented-file comparison. The backend performs comparison and persistence; the frontend does not hash or decide results.
+
+The UI accepts only `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`, displays the returned comparison and evidence/version context, and keeps verification separate from evidence upload and attestation. Backend response parsing is strict; malformed envelopes, statuses, timestamps, hashes, or proof data are surfaced as errors. Backend 400/401/403/404/409/422 semantics are preserved through the shared API client.
+
+Persisted history uses the existing authenticated `GET /api/v1/passports` projection because no verification GET endpoint is mounted. Records are rendered in the backend-provided order with returned project/milestone/evidence-version metadata. Blockchain proof is confirmed only when the response includes both a transaction hash and a positive block number; partial metadata is pending and absent proof is explicitly absent. The browser never queries the EVM or submits transactions.
+
+TESTS:
+
+* Verification submission API tests cover the real JSON and multipart POST shapes, response envelope/state parsing, malformed records, and backend error propagation.
+* Verification UI/history tests cover canonical statuses, loading/empty/error/malformed states, persisted history order and context, proof confirmation rules, and evidence-upload separation.
+* Full frontend suite/build results are recorded with the Task 6 commit.
+
+KNOWN LIMITATIONS:
+
+* There is no `GET /api/v1/verification` route. History comes from `GET /api/v1/passports` and only includes its documented projection fields; it does not provide presented hashes or detailed reason codes.
+* Live backend smoke testing is not claimed unless the local backend is reachable and authenticated verification can be exercised.
+
+BACKEND FILES MODIFIED: none.
+
+TASK 7 STATUS: NOT STARTED.
+
+---
+
 ## AGENT 2 TASK 4 — Contractors + Projects Frontend Workflow
 
 ## STATUS

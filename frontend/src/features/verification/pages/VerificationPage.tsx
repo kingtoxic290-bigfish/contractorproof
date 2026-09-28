@@ -9,6 +9,7 @@ import { QueryPanel } from "../../shared/QueryPanel";
 import { AttestationForm } from "../components/AttestationForm";
 import { EvidenceReview } from "../components/EvidenceReview";
 import { VerificationCompare } from "../components/VerificationCompare";
+import { VerificationHistory } from "../components/VerificationHistory";
 import { isUuid } from "../validation";
 
 function optionalUuid(value: string | null): string | undefined {
@@ -147,6 +148,8 @@ export function VerificationPage() {
         milestoneId={selectedMilestoneId}
         projectId={projectId}
       />
+
+      <VerificationHistory evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
 
       <VerificationCompare evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
 

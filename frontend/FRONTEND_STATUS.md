@@ -1,5 +1,31 @@
 # ContractorProof Frontend Status
 
+## Agent 2 Task 6: Verification workflow
+
+**Status: COMPLETE**
+
+- Internal verification submission uses authenticated `POST /api/v1/verification` with JSON `evidenceId` and/or `evidenceVersionId`, or multipart fields `evidenceId`, `evidenceVersionId`, and optional `file`. The frontend does not set multipart boundaries or compute hashes.
+- Evidence selection is scoped through the existing evidence list API. Reviewers may compare backend-stored bytes or submit a presented file as a separate verification action; upload never triggers verification.
+- Responses are strictly parsed from `{ data: { verification, proof }, meta }`. Malformed canonical state, fields, hash, proof, or envelope produces an explicit data error. Backend HTTP errors and codes are preserved.
+- Only `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE` are accepted and shown. MATCH is not described as independent blockchain proof; MISMATCH is a technical comparison only. No local verification status, retry loop, score, or trust judgment is created.
+- Persisted history is read from the existing authorized `GET /api/v1/passports` projection, in backend order, and associated with evidence versions and project/milestone context returned there. There is no `GET /api/v1/verification` endpoint. History and submission results remain separate views.
+- Proof metadata returned with POST results and the passport projection is confirmed only when a transaction hash and positive block number are both present. Partial proof metadata remains PENDING; absent proof is shown as not returned. The frontend does not access an EVM or create transactions.
+- Backend verification authorization allows ADMIN, AUDITOR, PROCUREMENT_OFFICER, CONSULTANT_ENGINEER, and CLIENT at the route gate; CONTRACTOR is denied. Project/evidence access is enforced by the backend. The frontend retains the shared 401 session behavior and presents 403/404/validation failures without bypassing access checks.
+
+TESTS:
+
+* Verification workflow tests include strict API envelope/state parsing, POST JSON/multipart contract and error propagation, history projection ordering/context, all four canonical statuses, empty/loading/malformed history, and confirmed/pending proof rules.
+* Full frontend test suite and build results are recorded in the Task 6 closure commit/report.
+
+KNOWN LIMITATIONS:
+
+* No dedicated verification GET/history endpoint exists. Persisted history is available only through `GET /api/v1/passports`; that projection includes verification ID/state/source/time and version/project/milestone context, but not presented hash or a verification-specific reason DTO.
+* Live backend verification is not claimed unless the local API health check and authenticated smoke request succeed.
+
+Task 7 was not started. Public verification and blockchain history/reconciliation were not modified.
+
+---
+
 ## Agent 2 Task 5: Milestones and Evidence
 
 **Status: COMPLETE**
