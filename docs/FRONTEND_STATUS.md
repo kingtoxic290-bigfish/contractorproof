@@ -1,5 +1,25 @@
 # ContractorProof — Frontend Status
 
+## Task 2 state: Authentication and typed API client integrated
+
+The frontend is now aligned to the actual backend authentication contract and uses a centralized typed API client built around the existing `/api/v1` base, bearer-token flow, and backend error envelope expectations.
+
+### Authentication and API integration
+
+- Verified login, registration, and current-user flows against the real backend routes in `POST /auth/login`, `POST /auth/register`, and `GET /auth/me`.
+- Preserved the backend JWT model and session semantics without introducing a second auth architecture.
+- Centralized request creation, bearer-header injection, JSON parsing, and error handling in the shared API client.
+- Added session restoration and expired-session cleanup through the auth provider and unauthorized listener flow.
+- Kept route protection working through the existing React Router guards and current auth status model.
+
+### Error handling and API semantics
+
+- Added/reused structured API error handling for 401, 403, 404, validation, and network failures.
+- Kept password and secrets out of the frontend environment and did not introduce any backend credential exposure.
+- Preserved backend authorization as the source of truth; frontend role checks remain navigation/UI helpers only.
+
+---
+
 ## Task 1 state: Design system and app shell established
 
 The frontend now has a stronger foundational layout and visual system while preserving the existing route structure and current auth architecture. No backend APIs or routes were changed in this task.

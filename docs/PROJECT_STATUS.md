@@ -4,6 +4,41 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ---
 
+## TASK 2 — Frontend Authentication + Typed API Client
+
+## STATUS
+
+COMPLETE
+
+The frontend is integrated with the backend authentication contract and uses a centralized typed API client that respects the existing `/api/v1` base, bearer-token format, JSON envelope handling, and role-based authorization model. The flow remains aligned to the backend: login/register via `/auth/*`, the authenticated user via `/auth/me`, token storage in the existing session utility, and route protection through the existing auth provider and guards.
+
+TESTS:
+
+* `cd frontend && npm test -- --run` — PASS (157/157 tests)
+* `cd frontend && npm run build` — PASS
+
+FILES MODIFIED:
+
+* `frontend/src/services/api/client.ts`
+* `frontend/src/services/api/auth.ts`
+* `frontend/src/services/api/errors.ts`
+* `frontend/src/features/auth/AuthContext.tsx`
+* `frontend/src/features/auth/ProtectedRoute.tsx`
+* `frontend/src/features/auth/GuestRoute.tsx`
+* `frontend/src/pages/LoginPage.tsx`
+* `frontend/src/types/auth.ts`
+* `frontend/src/types/roles.ts`
+
+KNOWN LIMITATIONS:
+
+* Task 2 establishes the shared client and auth flow only; it does not implement the dashboard or feature-page data integration work that belongs to later tasks.
+* Backend authorization remains authoritative; the frontend continues to use role checks only for UI visibility and navigation.
+
+NEXT TASK:
+TASK 3 — Dashboard Integration
+
+---
+
 ## TASK 1 — Frontend Design System + App Shell
 
 ## STATUS
