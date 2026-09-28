@@ -56,6 +56,31 @@ BACKEND FILES MODIFIED: none for Task 3.
 
 ---
 
+## AGENT 2 TASK 4 — Contractors and Projects Frontend Workflow
+
+## STATUS
+
+COMPLETE
+
+Implemented backend-backed contractor listing/detail, project listing/detail, and project creation on the existing protected routes. The list/detail APIs preserve their actual legacy response envelopes; creation consumes the backend `{ data: { project }, meta }` response. Strict parsing rejects malformed records rather than dropping them or converting them into empty collections.
+
+Contractor/project associations are composed only from records returned by authenticated APIs. Project creation is offered to CONTRACTOR and ADMIN: contractor ownership is left to backend session binding, while ADMIN must select a contractor returned by the backend. Project detail displays the actual project and contractor fields and does not add milestone/evidence workflow behavior.
+
+TESTS:
+
+* Focused contractor/project/API tests — 44/44 PASS
+* Full frontend (`cd frontend && npm test -- --run`) — 177/177 PASS
+* Production build (`cd frontend && npm run build`) — PASS, including TypeScript compilation
+* Desktop and 390px route review — PASS; no page-level horizontal overflow
+
+LIVE BACKEND SMOKE TEST: NOT RUN. `backend/.env` and `backend/node_modules` are absent, port 4000 refuses connections, and there are no configured safe development credentials. No live data or project was created.
+
+KNOWN LIMITATIONS: contractor names in project views can only be resolved where the authorized `/contractors` API response includes the associated contractor. The project detail page intentionally does not fetch milestone or evidence records in Task 4.
+
+BACKEND FILES MODIFIED: none for Task 4.
+
+---
+
 ## TASK 2 — Frontend Authentication + Typed API Client
 
 ## STATUS

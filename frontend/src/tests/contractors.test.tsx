@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listContractors, getContractor } from "../features/contractors/api/contractorsApi";
+import { listProjects } from "../features/projects/api/projectsApi";
 import { authApi } from "../services/api/auth";
 import { ApiError } from "../services/api/errors";
 import { contractorRecord } from "./fixtures";
@@ -17,6 +18,12 @@ vi.mock("../services/api/auth", () => ({
 vi.mock("../features/contractors/api/contractorsApi", () => ({
   listContractors: vi.fn(),
   getContractor: vi.fn(),
+}));
+
+vi.mock("../features/projects/api/projectsApi", () => ({
+  listProjects: vi.fn(),
+  getProject: vi.fn(),
+  createProject: vi.fn(),
 }));
 
 const harbor = contractorRecord({
@@ -37,20 +44,21 @@ describe("contractors", () => {
       fullName: "Demo Auditor",
       role: "AUDITOR",
     });
+    vi.mocked(listProjects).mockResolvedValue([]);
   });
 
   it("shows a loading state", async () => {
     vi.mocked(listContractors).mockReturnValue(new Promise(() => undefined));
     renderApp("/contractors");
-    expect(await screen.findByText("Loading contractor information...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading contractor and project records...")).toBeInTheDocument();
   });
 
   it("renders one contractor from returned fields only", async () => {
     vi.mocked(listContractors).mockResolvedValue([harbor]);
     renderApp("/contractors");
     expect((await screen.findAllByText("Harbor Works Ltd")).length).toBeGreaterThan(0);
-    expect(screen.getByRole("link", { name: "View contractor" })).toBeInTheDocument();
-    expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Harbor Works Ltd" })).toHaveAttribute("href", "/contractors/c1");
+    expect(screen.getAllByText("Not supplied").length).toBeGreaterThan(0);
     expect(screen.queryByText("98%")).not.toBeInTheDocument();
     expect(screen.queryByText("Trust Score")).not.toBeInTheDocument();
   });
@@ -60,7 +68,8 @@ describe("contractors", () => {
     renderApp("/contractors");
     expect((await screen.findAllByText("Harbor Works Ltd")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Quay Construction").length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: "View contractor" })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Harbor Works Ltd" })).toHaveAttribute("href", "/contractors/c1");
+    expect(screen.getByRole("link", { name: "Quay Construction" })).toHaveAttribute("href", "/contractors/c2");
   });
 
   it("shows an empty state when the API returns no records", async () => {
@@ -74,8 +83,52 @@ describe("contractors", () => {
     renderApp("/contractors/c1");
     expect((await screen.findAllByText("Harbor Works Ltd")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("c1").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Not supplied").length).toBeGreaterThan(0);
     expect(screen.queryByText("Trust Score")).not.toBeInTheDocument();
+    expect(await screen.findByText("No projects associated with this contractor.")).toBeInTheDocument();
+  });
+
+  it("shows only associated projects returned by the project API", async () => {
+    vi.mocked(getContractor).mockResolvedValue(harbor);
+    vi.mocked(listProjects).mockResolvedValue([
+      {
+        id: "project-owned",
+        contractorId: "c1",
+        name: "Harbor works",
+        description: null,
+        nestTenderReference: null,
+        nestContractReference: null,
+        ocid: null,
+        procuringEntity: null,
+        contractStatus: "ACTIVE",
+        contractStartDate: null,
+        contractEndDate: null,
+        nestSource: "SYNTHETIC_DEMO",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      },
+      {
+        id: "project-other",
+        contractorId: "c2",
+        name: "Other contractor project",
+        description: null,
+        nestTenderReference: null,
+        nestContractReference: null,
+        ocid: null,
+        procuringEntity: null,
+        contractStatus: null,
+        contractStartDate: null,
+        contractEndDate: null,
+        nestSource: "SYNTHETIC_DEMO",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+      },
+    ]);
+    renderApp("/contractors/c1");
+
+    expect(await screen.findByText("Harbor works")).toBeInTheDocument();
+    expect(screen.queryByText("Other contractor project")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Harbor works" })).toHaveAttribute("href", "/projects/project-owned");
   });
 
   it("shows a not-found state for a missing contractor", async () => {

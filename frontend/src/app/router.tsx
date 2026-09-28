@@ -13,6 +13,7 @@ import { PassportsPage } from "../features/passports/pages/PassportsPage";
 import { VerificationPage } from "../features/verification/pages/VerificationPage";
 import { VERIFY_INTERNAL_ROLES } from "../features/verification/types";
 import { ProjectDetailPage } from "../features/projects/pages/ProjectDetailPage";
+import { ProjectCreatePage } from "../features/projects/pages/ProjectCreatePage";
 import { ProjectsPage } from "../features/projects/pages/ProjectsPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { ForbiddenPage } from "../pages/ForbiddenPage";
@@ -50,6 +51,14 @@ export function AppRouter() {
         <Route path="/contractors" element={<ContractorsPage />} />
         <Route path="/contractors/:contractorId" element={<ContractorDetailPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
+        <Route
+          path="/projects/new"
+          element={
+            <RoleGate allow={["ADMIN", "CONTRACTOR"]}>
+              <ProjectCreatePage />
+            </RoleGate>
+          }
+        />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="/milestones" element={<MilestonesPage />} />
         <Route path="/evidence" element={<EvidencePage />} />
