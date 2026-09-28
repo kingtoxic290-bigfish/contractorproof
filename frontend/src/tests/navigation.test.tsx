@@ -34,7 +34,7 @@ describe("navigation", () => {
 
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Verification Dashboard" })).toBeInTheDocument();
     expect(screen.getAllByRole("navigation", { name: "Application" }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("link", { name: /Audit trail/i }).length).toBeGreaterThan(0);
   });
@@ -49,7 +49,7 @@ describe("navigation", () => {
 
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Verification Dashboard" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Audit trail/i })).not.toBeInTheDocument();
   });
 });

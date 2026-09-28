@@ -1,5 +1,32 @@
 # ContractorProof — Frontend Status
 
+## Task 3 state: Real evidence verification dashboard
+
+The protected `/dashboard` route now renders an operational overview from the authenticated `GET /api/v1/passports` projection. It uses the centralized API client and the backend's project-scoped result; no dashboard endpoint, backend change, role-based data bypass, or synthetic product data was added.
+
+### Dashboard data composition
+
+- Projects, project status when supplied, contractor names, milestones, evidence records, evidence versions, persisted verification rows, attestations, and blockchain proof events are parsed from the passport projection.
+- Summary counts are calculated from those returned records. The verification overview preserves the canonical `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE` values.
+- Recent activity is composed only from timestamped project, milestone, evidence, verification, attestation, and blockchain-proof records in the response, sorted by the returned timestamps.
+- Project, attention, and activity links use the existing `/projects/:projectId` route.
+- Confirmed proof is shown only when the backend projection marks it confirmed; pending and absent proof events are presented factually. No reputation, trust, quality, or completion score is calculated.
+
+### Loading, empty, and error behavior
+
+- The existing `LoadingState` is shown while the passport projection loads.
+- A successful empty `passports` array shows a genuine no-project state and zero record counts.
+- API failures show `ErrorState`; 401, 403, 404, server errors, and network failures receive distinct wording. A 403 does not log the user out or populate fake data.
+- Malformed projection data is rejected as an unavailable dashboard response instead of being interpreted as an empty result.
+
+### Verification and limitations
+
+- Backend route/controller/service inspection confirmed the authenticated `GET /api/v1/passports` contract, scoped list behavior, response envelope, nested verification records, and persisted proof metadata. `GET /verification` is not a read endpoint and `GET /blockchain` is a 501 stub, so neither is called.
+- Dashboard tests cover successful rendering and counts, all canonical verification states, successful empty data, API errors, 401/403 presentation, endpoint usage, and malformed responses.
+- Full frontend tests: 164/164 passed. Production TypeScript/Vite build passed.
+- Desktop and 390px browser previews rendered without horizontal page overflow. No local backend was listening on port 4000, so live database-backed smoke testing could not be performed.
+- Proof details, passport variations/corrections, and backend verification rows are limited to fields returned by the current passport projection; no direct blockchain-event list or standalone verification-results list is available.
+
 ## Task 2 state: Authentication and typed API client integrated
 
 The frontend is now aligned to the actual backend authentication contract and uses a centralized typed API client built around the existing `/api/v1` base, bearer-token flow, and backend error envelope expectations.

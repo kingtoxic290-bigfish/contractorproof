@@ -31,6 +31,31 @@ Commit hash is reported in the Task 6 completion report.
 
 ---
 
+## AGENT 2 TASK 3 — Real Evidence Verification Dashboard
+
+## STATUS
+
+COMPLETE
+
+The protected frontend dashboard now uses the authenticated `GET /api/v1/passports` projection. It composes accessible projects, milestones, evidence, verification history, attestations, and proof state from the backend response, preserving the backend's authorization scope. The dashboard uses no fabricated records or metrics and adds no backend endpoint or backend code.
+
+Summary counts are derived from the returned records. Verification states remain `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`. Recent activity is composed from timestamped records in the response. Project, activity, and attention links use the existing project detail route. Confirmed and pending proof are distinguished using the passport's persisted proof fields; projects with no returned proof events are shown as having no proof.
+
+Loading, successful-empty, malformed-response, and API error states are distinct. A 403 remains an authorization state without clearing the authenticated session. The dashboard does not use the verification POST endpoint as a read or call the unimplemented blockchain list endpoint.
+
+TESTS:
+
+* Dashboard/API tests — 7/7 PASS
+* Full frontend (`cd frontend && npm test -- --run`) — 164/164 PASS
+* Production build (`cd frontend && npm run build`) — PASS, including TypeScript compilation
+* Desktop and 390px browser preview — PASS; no horizontal page overflow
+
+KNOWN LIMITATIONS: local backend health check on port 4000 was unavailable, so live database-backed smoke testing was not possible. Verification and proof summaries include only records returned by the existing passport projection.
+
+BACKEND FILES MODIFIED: none for Task 3.
+
+---
+
 ## TASK 2 — Frontend Authentication + Typed API Client
 
 ## STATUS
