@@ -427,9 +427,50 @@ Blockchain anchoring uses existing `recordCorrection` only after approval, and o
 
 Passport history includes original proof/version, corrected evidence versions, resolution history, and correction proof without exposing storage paths. No Passport table was added.
 
-## Variations (target)
+## Variations (implemented)
 
-Keep existing path prefixes. POST creates a **new** linked record and optional new EvidenceVersion. Never overwrite historical hashes. Authz: project members / ADMIN; CONTRACTOR cannot “resolve as verified” via these routes.
+All routes require JWT. Create roles are CONTRACTOR (own project) and ADMIN. Read uses the existing project access matrix: ADMIN/AUDITOR/PROCUREMENT_OFFICER may read all; CONTRACTOR reads own projects; other roles have no project membership and are denied. Review/resolution roles are ADMIN/AUDITOR/PROCUREMENT_OFFICER.
+
+### POST `/api/v1/variations`
+
+Body:
+
+```json
+{
+  "projectId": "uuid",
+  "milestoneId": "uuid",
+  "previousEventId": "uuid",
+  "variationReference": "VO-001",
+  "reason": "Scope adjustment",
+  "evidenceId": "uuid",
+  "changes": {
+    "project": { "name": "Revised project name" },
+    "milestone": { "description": "Revised deliverables" }
+  }
+}
+```
+
+`changes.project` accepts supported project fields (`name`, `description`, NEST references, `ocid`, `procuringEntity`, `contractStatus`, contract start/end dates). `changes.milestone` accepts `name` and `description`, and requires `milestoneId`. At least one field must be proposed. Project, milestone, evidence, and prior event references are validated after write authorization. `(projectId, variationReference)` is unique; independent variation references remain distinct business events.
+
+Response: `{ "data": { "variation": { "id", "projectId", "milestoneId", "variationReference", "reason", "status", "originalState", "proposedState", "previousProof", "variationProof", "evidence", "resolutions" } }, "meta": {} }`.
+
+### GET `/api/v1/variations` and GET `/api/v1/variations/:variationId`
+
+List accepts optional `projectId`; inaccessible project reads are denied. Detail returns 404 for unknown IDs and 403 for an inaccessible project. Envelopes are `{ "data": { "variations": [...] }, "meta": {} }` and `{ "data": { "variation": ... }, "meta": {} }`.
+
+### POST `/api/v1/variations/:variationId/review`
+
+Resolver roles only. `OPEN` transitions to `UNDER_REVIEW`; repeating `UNDER_REVIEW` is idempotent. Closed variations return 409.
+
+### POST `/api/v1/variations/:variationId/resolve`
+
+Body: `{ "status": "APPROVED" | "REJECTED", "decision": "...", "note": "..." }`. A separate one-per-variation resolution preserves decision, note, actor, and timestamp. Identical retries reuse the stored resolution; conflicting decisions return 409. Approval applies proposed project/milestone values in the same PostgreSQL transaction that records the resolution. Rejection leaves project/milestone state unchanged. The variation retains original and proposed snapshots, so changed current values do not rewrite what the project originally contained.
+
+Evidence is referenced but never modified by a variation. Existing EvidenceVersion hashes, Verification rows, and earlier BlockchainEvents remain append-only. New evidence is uploaded through the existing evidence workflow and retains its independent version/hash/verification history.
+
+The contract already implements `recordVariation`; no contract changes were made. An approved variation is anchored only when its source event is confirmed and a writable registry is configured. The service creates a pending `BlockchainEvent` using the existing logical key before submission and confirms only with a successful receipt, transaction hash, and block number. Failed writes remain pending and are not reported as confirmed. Identical approved-resolution retries reuse and can confirm the pending event. An unconfirmed source or missing writable registry produces no variation proof. Passport remains a read-only projection and includes variation snapshots, resolution, related evidence, and source/variation proof state; no Passport table was added.
+
+Legacy `ContractVariation` rows created before snapshot support are explicitly marked as having unavailable original/proposed snapshots; the prior schema did not preserve enough information to reconstruct them.
 
 ---
 

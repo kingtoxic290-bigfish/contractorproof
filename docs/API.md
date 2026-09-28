@@ -438,8 +438,37 @@ Optional query: `milestoneId`, `projectId`. Inaccessible filters return `{ "data
 
 Responses never include `passwordHash`, storage keys/paths, or private infrastructure secrets. Transaction hash and block number are exposed only as fields of an explicitly `CONFIRMED` or `PENDING` proof object.
 
+## Variations
+
+All routes require JWT authentication. `CONTRACTOR` and `ADMIN` may create for a project; contractors are restricted to their own projects. `ADMIN`, `AUDITOR`, and `PROCUREMENT_OFFICER` may review and resolve. Project reads follow the established access helper.
+
+`POST /api/v1/variations` body:
+
+```json
+{
+  "projectId": "uuid",
+  "milestoneId": "uuid",
+  "previousEventId": "uuid",
+  "variationReference": "VO-001",
+  "reason": "Scope adjustment",
+  "evidenceId": "uuid",
+  "changes": {
+    "project": { "name": "Revised project name" },
+    "milestone": { "description": "Revised deliverables" }
+  }
+}
+```
+
+At least one supported project or milestone field must change. `milestoneId` and `evidenceId` are optional unless milestone changes or related evidence are supplied. The previous BlockchainEvent must belong to the project. A project/reference pair is unique; repeating that reference returns 409.
+
+Lifecycle: `OPEN` → `UNDER_REVIEW` → `APPROVED` or `REJECTED`. Resolution body: `{ "status": "APPROVED" | "REJECTED", "decision": "...", "note": "..." }`. Identical resolutions are idempotent; conflicting resolutions return 409. Approval applies only the proposed fields and stores the original project/milestone snapshot and resolution. Rejection does not apply proposed changes.
+
+Routes: `GET /api/v1/variations?projectId=uuid`, `GET /api/v1/variations/:variationId`, `POST /api/v1/variations/:variationId/review`, `POST /api/v1/variations/:variationId/resolve`. Responses use `{ "data": ..., "meta": {} }`.
+
+The contract already supports `recordVariation`. When a writable registry is configured, approved variations with a confirmed source event create a pending `BlockchainEvent` before submission and confirm only after a successful receipt. Failures remain pending and identical approval retries reuse the logical event. An unconfirmed source or unavailable registry creates no variation proof. Passport exposes original/proposed snapshots, decisions, and proof state.
+
 ## Stubs (501)
 
-GET attestations, variations, passports, blockchain, POST public/verify.
+GET blockchain, POST public/verify.
 
 Public POST verify will return MATCH or MISMATCH for fingerprint compare only. MATCH does not prove the construction claim.

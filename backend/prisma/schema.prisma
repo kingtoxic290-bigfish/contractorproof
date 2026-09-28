@@ -49,6 +49,13 @@ enum CorrectionStatus {
   REJECTED
 }
 
+enum VariationStatus {
+  OPEN
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
 enum BlockchainEventType {
   PROJECT_REGISTERED
   VERIFICATION
@@ -93,6 +100,8 @@ model User {
   verifications            Verification[]
   disputeResolutions       DisputeResolution[]  @relation("DisputeResolutionActor")
   correctionResolutions    CorrectionResolution[] @relation("CorrectionResolutionActor")
+  variationResolutions     VariationResolution[]  @relation("VariationResolutionActor")
+  variationReviews         ContractVariation[]    @relation("VariationReviewer")
 }
 
 model Contractor {
@@ -175,6 +184,7 @@ model Milestone {
   attestations Attestation[]
   disputes     Dispute[]
   corrections  Correction[]
+  variations   ContractVariation[]
 
   @@index([projectId])
   @@index([policyId])
@@ -306,7 +316,8 @@ model BlockchainEvent {
   disputesAsProof      Dispute[]           @relation("DisputeProofEvent")
   correctionsAsProof   Correction[]        @relation("CorrectionProofEvent")
   corrections          Correction[]
-  variations           ContractVariation[]
+  variationsAsPrevious ContractVariation[] @relation("VariationPreviousEvent")
+  variationsAsProof    ContractVariation[] @relation("VariationProofEvent")
 
   @@index([projectId])
   @@index([eventType])
@@ -402,19 +413,49 @@ model ContractVariation {
   projectId          String
   project            Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
   previousEventId    String
-  previousEvent      BlockchainEvent @relation(fields: [previousEventId], references: [id], onDelete: Restrict)
+  previousEvent      BlockchainEvent @relation("VariationPreviousEvent", fields: [previousEventId], references: [id], onDelete: Restrict)
   variationReference String
   reason             String
   evidenceId         String?
   evidence           Evidence?       @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
   actorId            String
   actor              User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  reviewedById       String?
+  reviewedBy         User?            @relation("VariationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt         DateTime?
+  status             VariationStatus @default(OPEN)
+  milestoneId        String?
+  milestone          Milestone?      @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  originalState      Json
+  proposedState      Json
+  variationEventId   String?         @unique
+  variationEvent     BlockchainEvent? @relation("VariationProofEvent", fields: [variationEventId], references: [id], onDelete: Restrict)
+  resolutions        VariationResolution[]
   createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
 
   @@index([projectId])
   @@index([previousEventId])
   @@index([actorId])
   @@unique([projectId, variationReference])
+  @@index([milestoneId])
+  @@index([status])
+  @@index([reviewedById])
+}
+
+model VariationResolution {
+  id           String          @id @default(uuid())
+  variationId  String          @unique
+  variation    ContractVariation @relation(fields: [variationId], references: [id], onDelete: Restrict)
+  status       VariationStatus
+  decision     String
+  note         String
+  resolvedById String
+  resolvedBy   User            @relation("VariationResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime        @default(now())
+
+  @@index([resolvedById])
+  @@index([createdAt])
 }
 
 model AuditLog {

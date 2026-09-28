@@ -128,16 +128,17 @@ describe("evidence versions, disputes, corrections, and variations", () => {
     expect(version?.sha256).toBe(upload.body.data.evidence.sha256);
   });
 
-  it("keeps variations unimplemented rather than overwriting history", async () => {
+  it("exposes authenticated project-scoped variations with validation", async () => {
     const owner = await registerContractor();
     const get = await request(app)
       .get("/api/v1/variations")
       .set("Authorization", `Bearer ${owner.token}`);
-    expect(get.status).toBe(501);
+    expect(get.status).toBe(200);
+    expect(get.body.data.variations).toEqual([]);
     const post = await request(app)
       .post("/api/v1/variations")
       .set("Authorization", `Bearer ${owner.token}`)
       .send({ reason: "scope change" });
-    expect(post.status).toBe(501);
+    expect(post.status).toBe(400);
   });
 });

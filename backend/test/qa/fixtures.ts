@@ -154,6 +154,9 @@ export async function cleanupQaUsers(): Promise<void> {
   await prisma.correctionResolution.deleteMany({
     where: { correction: { milestone: { project: { contractor: { userId: { in: ids } } } } } },
   });
+  await prisma.variationResolution.deleteMany({
+    where: { variation: { project: { contractor: { userId: { in: ids } } } } },
+  });
   await prisma.correction.deleteMany({
     where: { milestone: { project: { contractor: { userId: { in: ids } } } } },
   });

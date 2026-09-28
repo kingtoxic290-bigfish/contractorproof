@@ -327,6 +327,42 @@ export class BlockchainService {
     };
   }
 
+  async recordVariation(input: {
+    eventId: string;
+    previousEventId: string;
+    variationReference: string;
+    actorId: string;
+  }): Promise<ConfirmedProof> {
+    await this.assertReadyForWrites();
+    const encoded = {
+      eventId: this.encodeId(input.eventId, "eventId"),
+      previousEventId: this.encodeId(input.previousEventId, "previousEventId"),
+      variationRef: this.encodeId(input.variationReference, "variationReference"),
+      actorId: this.encodeId(input.actorId, "actorId"),
+    };
+    const contract = this.getSignerContract();
+    let tx;
+    try {
+      tx = await contract.recordVariation(
+        encoded.eventId,
+        encoded.previousEventId,
+        encoded.variationRef,
+        encoded.actorId,
+      );
+    } catch (error) {
+      mapRevert(error);
+    }
+    const receipt = await this.waitForConfirmation(tx);
+    this.assertNamedEvent(receipt, "VariationRecorded", encoded);
+    return {
+      txHash: receipt.hash,
+      blockNumber: Number(receipt.blockNumber),
+      evidenceHash: "",
+      eventId: input.eventId,
+      contractAddress: this.config.contractAddress,
+    };
+  }
+
   private encodeVerification(input: RecordProofInput) {
     const evidenceHash = this.encodeHash(input.evidenceHash);
     return {
@@ -465,7 +501,7 @@ export class BlockchainService {
 
   private assertNamedEvent(
     receipt: TransactionReceipt,
-    eventName: "DisputeRecorded" | "ResolutionRecorded" | "CorrectionRecorded",
+    eventName: "DisputeRecorded" | "ResolutionRecorded" | "CorrectionRecorded" | "VariationRecorded",
     expected: Record<string, string>,
   ): void {
     const match = receipt.logs

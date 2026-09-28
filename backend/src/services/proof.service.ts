@@ -62,6 +62,12 @@ export type ProofBlockchainWriter = {
     disputeEventId: string;
     actorId: string;
   }): Promise<ConfirmedProof>;
+  recordVariation(input: {
+    eventId: string;
+    previousEventId: string;
+    variationReference: string;
+    actorId: string;
+  }): Promise<ConfirmedProof>;
 };
 
 export type ProofView = {
@@ -344,6 +350,42 @@ export const proofService = {
           eventId: event.id,
           previousEventId: input.originalEventId,
           evidenceHash: input.correctedEvidenceHash,
+          actorId: input.actorId,
+        }),
+      });
+    } catch {
+      const pending = await blockchainEventRepository.findById(event.id);
+      return toProofView(pending ?? event);
+    }
+  },
+
+  async anchorVariation(input: {
+    variationId: string;
+    projectId: string;
+    previousEventId: string;
+    variationReference: string;
+    actorId: string;
+  }): Promise<ProofView | null> {
+    const chain = writer();
+    if (!chainWritesRequired(chain)) return null;
+
+    const { event, created } = await blockchainEventRepository.createPending({
+      projectId: input.projectId,
+      eventType: BlockchainEventType.VARIATION,
+      referenceId: input.variationId,
+      previousEventId: input.previousEventId,
+      actorId: input.actorId,
+    });
+
+    try {
+      return await confirmOrReuse({
+        event,
+        created,
+        evidenceHash: "",
+        submit: () => writer().recordVariation({
+          eventId: event.id,
+          previousEventId: input.previousEventId,
+          variationReference: input.variationReference,
           actorId: input.actorId,
         }),
       });

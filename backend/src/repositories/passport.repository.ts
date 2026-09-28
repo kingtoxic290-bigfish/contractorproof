@@ -85,8 +85,19 @@ const passportInclude = {
       },
     },
   },
+  variations: {
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    include: {
+      previousEvent: { select: { id: true, eventType: true, referenceId: true, txHash: true, blockNumber: true, createdAt: true } },
+      variationEvent: { select: { id: true, eventType: true, referenceId: true, txHash: true, blockNumber: true, createdAt: true } },
+      reviewedBy: { select: { id: true, role: true } },
+      milestone: { select: { id: true, name: true, description: true } },
+      resolutions: { orderBy: [{ createdAt: "asc" }, { id: "asc" }], include: { resolvedBy: { select: { id: true, role: true } } } },
+      evidence: { select: { id: true, currentVersionId: true, sha256: true } },
+    },
+  },
   blockchainEvents: {
-    where: { eventType: { in: [BlockchainEventType.VERIFICATION, BlockchainEventType.ATTESTATION, BlockchainEventType.CORRECTION] } },
+    where: { eventType: { in: [BlockchainEventType.VERIFICATION, BlockchainEventType.ATTESTATION, BlockchainEventType.CORRECTION, BlockchainEventType.VARIATION] } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     select: {
       id: true,

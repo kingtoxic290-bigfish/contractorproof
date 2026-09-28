@@ -23,6 +23,28 @@ function toPassportProof(event: PassportProjectRow["blockchainEvents"][number]) 
   };
 }
 
+function toRelatedProof(event: {
+  id: string;
+  eventType: BlockchainEventType;
+  referenceId: string | null;
+  txHash: string | null;
+  blockNumber: number | null;
+  createdAt: Date;
+} | null) {
+  if (!event) return null;
+  const confirmed = Boolean(event.txHash && event.blockNumber != null && event.blockNumber > 0);
+  return {
+    id: event.id,
+    eventType: event.eventType,
+    referenceId: event.referenceId,
+    txHash: event.txHash,
+    blockNumber: event.blockNumber,
+    confirmationState: confirmed ? "CONFIRMED" : "PENDING",
+    confirmed,
+    createdAt: event.createdAt.toISOString(),
+  };
+}
+
 function projectPassport(row: PassportProjectRow) {
   const blockchainProofs = row.blockchainEvents.map(toPassportProof);
   const proofFor = (eventType: BlockchainEventType, referenceId: string) =>
@@ -158,6 +180,29 @@ function projectPassport(row: PassportProjectRow) {
             : null,
           createdAt: resolution.createdAt.toISOString(),
         })),
+      })),
+    })),
+    variations: row.variations.map((variation) => ({
+      id: variation.id,
+      variationReference: variation.variationReference,
+      reason: variation.reason,
+      status: variation.status,
+      createdAt: variation.createdAt.toISOString(),
+      review: variation.reviewedAt ? { reviewedById: variation.reviewedById, reviewedByRole: variation.reviewedBy?.role ?? null, reviewedAt: variation.reviewedAt.toISOString() } : null,
+      originalState: variation.originalState,
+      proposedState: variation.proposedState,
+      milestone: variation.milestone,
+      evidence: variation.evidence,
+      previousProof: toRelatedProof(variation.previousEvent),
+      variationProof: toRelatedProof(variation.variationEvent),
+      resolutions: variation.resolutions.map((resolution) => ({
+        id: resolution.id,
+        status: resolution.status,
+        decision: resolution.decision,
+        note: resolution.note,
+        resolvedById: resolution.resolvedById,
+        resolvedByRole: resolution.resolvedBy.role,
+        createdAt: resolution.createdAt.toISOString(),
       })),
     })),
     blockchainProofs,

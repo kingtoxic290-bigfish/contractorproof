@@ -2,6 +2,33 @@
 
 This file is the Agent 1 task ledger. Update it after every task. Use only COMPLETE, PARTIAL, or BLOCKED.
 
+## CURRENT TASK
+
+TASK 6 — Variations Lifecycle
+
+## STATUS
+
+COMPLETE
+
+`ContractVariation` now captures immutable original/proposed project and optional milestone snapshots. A separate `VariationResolution` records the decision, note, resolver, and time. Approval applies the proposed fields and records the resolution in one PostgreSQL transaction; rejection preserves the original current state. The original project/milestone values remain recoverable from the variation snapshot. Evidence, versions, verification rows, and prior proof events are referenced/preserved and never rewritten.
+
+Routes: `POST/GET /api/v1/variations`, `GET /:variationId`, `POST /:variationId/review`, and `POST /:variationId/resolve`. Contractors create and read only on their projects; ADMIN/AUDITOR/PROCUREMENT_OFFICER can read and resolve using existing project access. Distinct variations are allowed, while `(projectId, variationReference)` uniqueness preserves the existing domain rule. Identical resolution retries are idempotent; conflicting resolutions return 409.
+
+The existing `recordVariation` contract method is now called through `BlockchainService` and proof orchestration. Approved variations with a confirmed source event create a pending `BlockchainEvent` before submission, and only successful receipts with a transaction hash and block number become confirmed. Failure leaves a pending event for retry; an unconfirmed source does not create a variation proof. The derived Passport includes original/proposed snapshots, decision, related evidence, and source/variation proof state. No Passport table or contract change was introduced.
+
+TESTS:
+
+* Focused variations — 8/8 PASS
+* Correction, dispute, Passport, verification/attestation and history regressions — 92/92 PASS
+* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — 240/240 PASS
+* `npx tsc --noEmit` — PASS
+* `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
+* Hardhat — 6/6 PASS; live backend Hardhat BlockchainService tests — 3/3 PASS
+
+KNOWN LIMITATIONS: project/milestone fields supported by variations are limited to the explicitly validated allowlists. Evidence is referenced rather than edited by a variation; new evidence continues through the existing upload/version workflow. Any legacy variation rows from the pre-lifecycle schema are marked with unavailable snapshot metadata because that schema stored no before/after state.
+
+Commit hash is reported in the Task 6 completion report.
+
 ---
 
 ## TASK 2 — Frontend Authentication + Typed API Client
