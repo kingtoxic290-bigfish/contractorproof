@@ -4,11 +4,24 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 8 — Contractor Passport UI
+TASK 9 — Public Verification UI
 
 ## STATUS
 
 COMPLETE
+
+The public `/verify` experience now submits the backend-required multipart file and evidence reference(s) to `POST /api/v1/public/verify` without authentication. It strictly accepts the public response projection and displays only the canonical verification state, backend meaning, evidence-version reference, and confirmed proof transaction hash/block number when returned. It does not hash files, create proof state, expose internal metadata, or assess a contractor.
+
+MATCH, MISMATCH, PENDING, and UNAVAILABLE are presented only as evidence/proof comparison states. Request validation, HTTP errors, rate limits, malformed responses, and network failures remain visible errors rather than being relabelled UNAVAILABLE. Proof is confirmed only with a transaction hash and positive block number.
+
+TESTS:
+
+* Focused public verification API and UI tests — PASS (20/20).
+* Full frontend and relevant backend regression outcomes are recorded in the Task 9 completion report.
+
+---
+
+## TASK 8 — Contractor Passport UI
 
 The existing Passport list/detail routes now use the authenticated backend-derived project Passport projection. The frontend calls `GET /api/v1/passports` and `GET /api/v1/passports/:projectId`, strictly parses their documented `data.passports` and `data.passport` envelopes, and preserves the existing shared loading, empty, error, retry, and authorization handling.
 

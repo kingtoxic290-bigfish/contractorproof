@@ -1,5 +1,27 @@
 # ContractorProof Frontend Status
 
+## Task 9: Public Verification UI
+
+**Status: COMPLETE**
+
+- The public `/verify` route remains outside the authenticated application shell (with `/public/verify` redirecting to it) and submits only to `POST /api/v1/public/verify`.
+- The form sends backend-required multipart fields: a non-empty `file` and at least one UUID reference (`evidenceId` and/or `evidenceVersionId`). No browser-side hashing, proof lookup, or verification decision is performed.
+- The UI strictly parses the public `{ data: { verification }, meta }` projection and permits only `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`. It displays the backend-supplied meaning and only the returned evidence-version reference.
+- Blockchain proof is `CONFIRMED` only when the public response provides a transaction hash and positive block number. Otherwise it is explicitly not confirmed; no explorer URL or private/internal metadata is exposed.
+- API, validation, server, rate-limit, and network failures are shown as request errors rather than being converted to `UNAVAILABLE`. Public requests use the shared API client with auth redirects suppressed.
+
+TESTS:
+
+* Focused public verification API/UI tests — 20/20 PASS.
+* Full-suite, lint, build, and backend regression results are recorded in the Task 9 completion report.
+
+KNOWN LIMITATIONS:
+
+* The authoritative public contract does not return timestamps or event names, so the UI does not render either.
+* Public proof data contains only confirmed transaction hash and block number; it is not treated as a statement about a contractor or underlying claim.
+
+---
+
 ## Agent 2 Task 6: Verification workflow
 
 **Status: COMPLETE**
