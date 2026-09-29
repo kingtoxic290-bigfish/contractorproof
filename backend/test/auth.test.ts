@@ -93,8 +93,14 @@ describe("authentication and registration", () => {
     });
     expect(unknown.status).toBe(401);
     expect(wrong.status).toBe(401);
-    expect(unknown.body).toEqual({ error: "invalid email or password" });
-    expect(wrong.body).toEqual(unknown.body);
+    expect(unknown.body.error).toMatchObject({
+      code: "UNAUTHENTICATED",
+      message: "invalid email or password",
+    });
+    expect(wrong.body.error).toMatchObject({
+      code: "UNAUTHENTICATED",
+      message: "invalid email or password",
+    });
   });
 
   it("rejects missing, malformed, expired, and wrongly signed tokens", async () => {

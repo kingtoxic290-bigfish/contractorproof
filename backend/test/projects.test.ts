@@ -107,7 +107,7 @@ describe("GET /api/v1/projects", () => {
   it("returns 401 without a JWT", async () => {
     const response = await request(app).get("/api/v1/projects");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -115,7 +115,7 @@ describe("GET /api/v1/projects", () => {
       .get("/api/v1/projects")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 200 and projects from the database", async () => {
@@ -179,7 +179,7 @@ describe("GET /api/v1/projects/:projectId", () => {
       "/api/v1/projects/11111111-1111-1111-1111-111111111111",
     );
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 200 for an existing project", async () => {
@@ -211,7 +211,7 @@ describe("GET /api/v1/projects/:projectId", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "project not found" });
+    expect(response.body.error).toMatchObject({ code: "NOT_FOUND", message: "project not found" });
   });
 
   it("returns 400 for an invalid UUID", async () => {
@@ -222,7 +222,7 @@ describe("GET /api/v1/projects/:projectId", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: "projectId must be a valid UUID" });
+    expect(response.body.error).toMatchObject({ code: "VALIDATION_ERROR", message: "projectId must be a valid UUID" });
   });
 
   it("returns only the requested project when multiple exist", async () => {
@@ -249,7 +249,7 @@ describe("GET /api/v1/projects/:projectId/milestones", () => {
       "/api/v1/projects/11111111-1111-1111-1111-111111111111/milestones",
     );
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -257,7 +257,7 @@ describe("GET /api/v1/projects/:projectId/milestones", () => {
       .get("/api/v1/projects/11111111-1111-1111-1111-111111111111/milestones")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 200 and only that project's milestones", async () => {
@@ -309,7 +309,7 @@ describe("GET /api/v1/projects/:projectId/milestones", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "project not found" });
+    expect(response.body.error).toMatchObject({ code: "NOT_FOUND", message: "project not found" });
   });
 
   it("returns 400 for an invalid project UUID", async () => {
@@ -320,7 +320,7 @@ describe("GET /api/v1/projects/:projectId/milestones", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: "projectId must be a valid UUID" });
+    expect(response.body.error).toMatchObject({ code: "VALIDATION_ERROR", message: "projectId must be a valid UUID" });
   });
 
   it("does not return milestones belonging to another project", async () => {

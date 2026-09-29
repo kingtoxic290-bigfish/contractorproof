@@ -166,7 +166,7 @@ describe("POST /api/v1/verification", () => {
       evidenceId: "11111111-1111-4111-8111-111111111111",
     });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -175,7 +175,7 @@ describe("POST /api/v1/verification", () => {
       .set("Authorization", "Bearer not-a-valid-token")
       .send({ evidenceId: "11111111-1111-4111-8111-111111111111" });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 400 when evidenceId and evidenceVersionId are missing", async () => {

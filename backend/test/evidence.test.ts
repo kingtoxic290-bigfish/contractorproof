@@ -177,7 +177,7 @@ describe("POST /api/v1/evidence", () => {
   it("returns 401 without a JWT", async () => {
     const response = await request(app).post("/api/v1/evidence");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -185,7 +185,7 @@ describe("POST /api/v1/evidence", () => {
       .post("/api/v1/evidence")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 400 when the multipart file is missing", async () => {
@@ -360,7 +360,7 @@ describe("GET /api/v1/evidence", () => {
   it("returns 401 without a JWT", async () => {
     const response = await request(app).get("/api/v1/evidence");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -368,7 +368,7 @@ describe("GET /api/v1/evidence", () => {
       .get("/api/v1/evidence")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns an empty accessible collection", async () => {

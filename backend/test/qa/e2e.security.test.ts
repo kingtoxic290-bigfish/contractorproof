@@ -23,13 +23,13 @@ describe("E2E-003 / E2E-004 authentication, RBAC, IDOR, and impersonation", () =
   it("returns 401 without a token and for invalid or expired JWTs", async () => {
     const missing = await request(app).get("/api/v1/evidence");
     expect(missing.status).toBe(401);
-    expect(missing.body).toEqual({ error: "missing bearer token" });
+    expect(missing.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
 
     const invalid = await request(app)
       .get("/api/v1/evidence")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(invalid.status).toBe(401);
-    expect(invalid.body).toEqual({ error: "invalid or expired token" });
+    expect(invalid.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
 
     const expired = jwt.sign(
       {
@@ -44,7 +44,7 @@ describe("E2E-003 / E2E-004 authentication, RBAC, IDOR, and impersonation", () =
       .get("/api/v1/evidence")
       .set("Authorization", `Bearer ${expired}`);
     expect(expiredResponse.status).toBe(401);
-    expect(expiredResponse.body).toEqual({ error: "invalid or expired token" });
+    expect(expiredResponse.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("distinguishes 403 for authenticated users without permission", async () => {

@@ -7,6 +7,7 @@ import {
   projectListWhere,
 } from "../services/access.service";
 import { projectService } from "../services/project.service";
+import { requireUuid } from "../services/evidence/validation";
 
 function requireUser(req: Request) {
   if (!req.user) {
@@ -36,7 +37,7 @@ export async function getProject(
 ): Promise<void> {
   try {
     const actor = requireUser(req);
-    const project = await projectService.getById(req.params.projectId);
+    const project = await projectService.getById(requireUuid(req.params.projectId, "projectId"));
     await assertCanReadProject(actor, project.id);
     res.json({ project });
   } catch (error) {
@@ -65,7 +66,7 @@ export async function listProjectMilestones(
 ): Promise<void> {
   try {
     const actor = requireUser(req);
-    const project = await projectService.getById(req.params.projectId);
+    const project = await projectService.getById(requireUuid(req.params.projectId, "projectId"));
     await assertCanReadProject(actor, project.id);
     const milestones = await projectService.listMilestones(project.id);
     res.json({ milestones });
@@ -83,7 +84,7 @@ export async function createProjectMilestone(
     const actor = requireUser(req);
     const milestone = await projectService.createMilestone(actor, {
       ...(req.body ?? {}),
-      projectId: req.params.projectId,
+      projectId: requireUuid(req.params.projectId, "projectId"),
     });
     sendData(res, { milestone }, 201);
   } catch (error) {
@@ -112,7 +113,9 @@ export async function getMilestone(
 ): Promise<void> {
   try {
     const actor = requireUser(req);
-    const milestone = await projectService.getMilestoneById(req.params.milestoneId);
+    const milestone = await projectService.getMilestoneById(
+      requireUuid(req.params.milestoneId, "milestoneId"),
+    );
     await assertCanReadMilestone(actor, milestone.id);
     res.json({ milestone });
   } catch (error) {

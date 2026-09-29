@@ -34,10 +34,14 @@ describe("error envelope and request correlation", () => {
     assertNoSecrets(response.body);
   });
 
-  it("keeps grandfathered auth errors as { error: string }", async () => {
+  it("returns authentication failures in the standard safe error envelope", async () => {
     const response = await request(app).get("/api/v1/auth/me");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toEqual({
+      code: "UNAUTHENTICATED",
+      message: "missing bearer token",
+      requestId: response.headers["x-request-id"],
+    });
     expect(response.headers["x-request-id"]).toEqual(expect.any(String));
   });
 });

@@ -45,6 +45,16 @@ KNOWN LIMITATIONS:
 
 ---
 
+## TASK 11 — Security Audit Compatibility
+
+STATUS: COMPLETE
+
+Frontend review found no `dangerouslySetInnerHTML`, browser-side blockchain signing, embedded private key/RPC credential, or client-side authoritative hash/proof decision. Public verification uses a strict allow-listed response projection, and protected route visibility remains only a UX control; backend authorization is authoritative.
+
+The client continues to surface the backend error envelope. Backend Task 11 standardizes authentication and validation failures on `{ error: { code, message, requestId } }`; frontend error parsing remains compatible. Existing limitation: the JWT is stored in localStorage, so XSS prevention remains important and replacing it with an HttpOnly-cookie session requires a separate architecture task.
+
+---
+
 ## Agent 2 Task 6: Verification workflow
 
 **Status: COMPLETE**

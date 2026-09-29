@@ -666,6 +666,22 @@ Awaiting next assignment.
 
 ---
 
+## TASK 11 — Security, Authorization & Error Audit
+
+STATUS: COMPLETE
+
+Audit scope covered authentication/JWT reloading, RBAC and project ownership, evidence and version scoping, verification, attestations, passports, disputes/corrections/variations, blockchain history/reconciliation, public verification privacy, multipart storage, Prisma query use, CORS/body limits, frontend data handling, and tracked-secret review.
+
+Findings and fixes:
+
+* **MEDIUM — inconsistent HTTP error envelope:** `HttpError` responses bypassed the documented structured error envelope. Authentication and validation failures now use `{ error: { code, message, requestId } }`; unknown exceptions always return a generic `INTERNAL_ERROR` response and never reflect exception details.
+* **LOW — malformed object identifiers on legacy controller paths:** contractor, project, project-milestone, and milestone routes now validate UUID route parameters before repository access, avoiding driver-dependent malformed-ID behavior.
+* No authentication bypass, role escalation, cross-project/cross-contractor IDOR, public proof privacy leak, filesystem-path response leak, client-controlled proof confirmation, raw SQL use, or tracked credential was found in the inspected paths.
+
+Tests: focused security/auth/error, evidence, verification, attestation, passport, blockchain-history, public-verification, dispute/correction/variation suites passed (including 66 tests in the final focused run); backend TypeScript build passed. CORS remains environment-configured through the single `FRONTEND_URL` origin and credentials are not enabled. JWT browser storage remains localStorage, which is an existing XSS-risk trade-off requiring a future session-architecture decision.
+
+---
+
 ## TASK 3 — Derived Contractor Passport
 
 STATUS: COMPLETE

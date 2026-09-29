@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { ApiError } from "../http/errors";
 import { assertCanReadContractor, contractorListWhere } from "../services/access.service";
 import { contractorService } from "../services/contractor.service";
+import { requireUuid } from "../services/evidence/validation";
 
 function requireUser(req: Request) {
   if (!req.user) {
@@ -31,7 +32,9 @@ export async function getContractor(
 ): Promise<void> {
   try {
     const actor = requireUser(req);
-    const contractor = await contractorService.getById(req.params.contractorId);
+    const contractor = await contractorService.getById(
+      requireUuid(req.params.contractorId, "contractorId"),
+    );
     await assertCanReadContractor(actor, contractor.id);
     res.json({ contractor });
   } catch (error) {

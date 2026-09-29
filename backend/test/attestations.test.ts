@@ -179,7 +179,7 @@ describe("POST /api/v1/attestations", () => {
       decision: "APPROVED",
     });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -192,7 +192,7 @@ describe("POST /api/v1/attestations", () => {
         decision: "APPROVED",
       });
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 400 when required fields are missing", async () => {

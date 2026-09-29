@@ -1,5 +1,4 @@
 import type { NextFunction, Request, Response } from "express";
-import { env } from "../config/env";
 import { ApiError } from "../http/errors";
 import { sendError } from "../http/envelope";
 import { EVIDENCE_ERROR_CODES, EvidenceError } from "../services/evidence";
@@ -37,12 +36,6 @@ const EVIDENCE_STATUS: Record<string, number> = {
   [EVIDENCE_ERROR_CODES.VERIFICATION_UNAVAILABLE]: 503,
 };
 
-function leaksInternalDetail(message: string): boolean {
-  return /prisma|sql|filesystem|stack|ECONNREFUSED|\/home\/|\/var\/|\/tmp\/|storage\//i.test(
-    message,
-  );
-}
-
 export function errorHandler(
   err: unknown,
   req: Request,
@@ -63,13 +56,21 @@ export function errorHandler(
   }
 
   if (err instanceof HttpError) {
-    res.status(err.statusCode).json({ error: err.message });
+    const code =
+      err.statusCode === 401
+        ? "UNAUTHENTICATED"
+        : err.statusCode === 403
+          ? "FORBIDDEN"
+          : err.statusCode === 404
+            ? "NOT_FOUND"
+            : err.statusCode === 409
+              ? "CONFLICT"
+              : "VALIDATION_ERROR";
+    sendError(res, err.statusCode, code, err.message, requestId);
     return;
   }
 
-  const fallback =
-    env.nodeEnv === "production" || !(err instanceof Error) || leaksInternalDetail(err.message)
-      ? "internal server error"
-      : err.message;
-  sendError(res, 500, "INTERNAL_ERROR", fallback, requestId);
+  // Unknown exceptions can carry driver, filesystem, or provider details. They are
+  // logged by the host; the HTTP boundary must never reflect them.
+  sendError(res, 500, "INTERNAL_ERROR", "internal server error", requestId);
 }

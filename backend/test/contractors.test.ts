@@ -74,7 +74,7 @@ describe("GET /api/v1/contractors", () => {
   it("returns 401 without a JWT", async () => {
     const response = await request(app).get("/api/v1/contractors");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 401 for an invalid JWT", async () => {
@@ -82,7 +82,7 @@ describe("GET /api/v1/contractors", () => {
       .get("/api/v1/contractors")
       .set("Authorization", "Bearer not-a-valid-token");
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "invalid or expired token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "invalid or expired token" });
   });
 
   it("returns 200 and contractors from the database", async () => {
@@ -155,7 +155,7 @@ describe("GET /api/v1/contractors/:contractorId", () => {
       "/api/v1/contractors/11111111-1111-1111-1111-111111111111",
     );
     expect(response.status).toBe(401);
-    expect(response.body).toEqual({ error: "missing bearer token" });
+    expect(response.body.error).toMatchObject({ code: "UNAUTHENTICATED", message: "missing bearer token" });
   });
 
   it("returns 200 for an existing contractor", async () => {
@@ -198,7 +198,7 @@ describe("GET /api/v1/contractors/:contractorId", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(404);
-    expect(response.body).toEqual({ error: "contractor not found" });
+    expect(response.body.error).toMatchObject({ code: "NOT_FOUND", message: "contractor not found" });
   });
 
   it("returns 400 for an invalid UUID", async () => {
@@ -209,7 +209,7 @@ describe("GET /api/v1/contractors/:contractorId", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(400);
-    expect(response.body).toEqual({ error: "contractorId must be a valid UUID" });
+    expect(response.body.error).toMatchObject({ code: "VALIDATION_ERROR", message: "contractorId must be a valid UUID" });
   });
 
   it("does not expose password hashes on the detail payload", async () => {
