@@ -4,7 +4,34 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 5.5 — UI polish, icon system, and visual refinement
+TASK 8 — Contractor Passport UI
+
+## STATUS
+
+COMPLETE
+
+The existing Passport list/detail routes now use the authenticated backend-derived project Passport projection. The frontend calls `GET /api/v1/passports` and `GET /api/v1/passports/:projectId`, strictly parses their documented `data.passports` and `data.passport` envelopes, and preserves the existing shared loading, empty, error, retry, and authorization handling.
+
+The project Passport displays returned contractor/project metadata, milestones, evidence records, every ordered version and SHA-256, canonical verification history, attestations, related proof, corrections with original/corrected versions and resolutions, variation snapshots/resolutions, and dated record history. No trust, reputation, safety, or risk score is produced; `MISMATCH` remains a technical comparison result. Historical versions are rendered separately and are not overwritten.
+
+TESTS:
+
+* Passport API and UI tests — 19/19 PASS
+* Relevant backend Passport regressions — 8/8 PASS
+* Frontend lint — PASS
+* Frontend TypeScript/production build — PASS
+* Full frontend suite with `VITE_API_ORIGIN=http://127.0.0.1:65534 npm test` — 29/29 files, 213/213 PASS.
+* Plain `npm test` with the local backend active returned 211/213 because an existing milestone-create test issues an unmocked project read with a seeded fake token, receives a live 401, and reaches the session-expired screen. It passes with the API origin isolated; Task 8 does not change that workflow.
+
+KNOWN LIMITATIONS:
+
+* Passport evidence DTOs do not include filenames or MIME/size metadata; the UI therefore identifies evidence by returned IDs.
+* Disputes are not included in the current Passport DTO. The UI does not join a separate disputes endpoint into this derived record.
+* Live `GET /health` returned HTTP 200 and unauthenticated `GET /api/v1/passports` returned HTTP 401 as expected. The protected Passport page redirected to sign-in in the browser because no user bearer token was available; authenticated visual rendering and live CRUD behavior are not claimed.
+
+---
+
+## TASK 5.5 — UI polish, icon system, and visual refinement
 
 ## STATUS
 

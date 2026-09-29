@@ -57,7 +57,7 @@ export const PAGE_TITLES: Record<string, string> = {
   "/milestones": "Milestones",
   "/evidence": "Evidence",
   "/verification": "Verification",
-  "/passports": "Performance passports",
+  "/passports": "Contractor Passports",
   "/disputes": "Disputes",
   "/corrections": "Corrections",
   "/variations": "Variations",

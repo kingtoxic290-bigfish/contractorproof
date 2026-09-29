@@ -82,7 +82,7 @@ export function AppRouter() {
           }
         />
         <Route path="/passports" element={<PassportsPage />} />
-        <Route path="/passports/:contractorId" element={<PassportDetailPage />} />
+        <Route path="/passports/:projectId" element={<PassportDetailPage />} />
         <Route
           path="/disputes"
           element={

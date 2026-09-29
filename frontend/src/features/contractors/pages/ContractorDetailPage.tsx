@@ -35,20 +35,18 @@ export function ContractorDetailPage() {
           </Card>
         ) : null}
       </QueryPanel>
-      <Card title="Associated projects" description="A contractor-to-projects list is not provided by the current API.">
+      <Card title="Associated projects" description="Open project-scoped Passports for the project records accessible to this account.">
         <p className="text-sm text-stone-600">
-          Project records can be opened from the projects module when that API returns data.
+          The Passport list is based on the backend-authorized project projection.
         </p>
-        {contractorId ? (
-          <p className="mt-3">
-            <Link
-              to={`/passports/${encodeURIComponent(contractorId)}`}
-              className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
-            >
-              View project history
-            </Link>
-          </p>
-        ) : null}
+        <p className="mt-3">
+          <Link
+            to="/passports"
+            className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+          >
+            View contractor Passports
+          </Link>
+        </p>
       </Card>
     </section>
   );

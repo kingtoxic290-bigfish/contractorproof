@@ -96,6 +96,7 @@ describe("projects", () => {
     expect(await screen.findByText("Bridge deck")).toBeInTheDocument();
     expect(await screen.findByText("No milestones available.")).toBeInTheDocument();
     expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "View project Passport" })).toHaveAttribute("href", "/passports/p1");
   });
 
   it("loads project milestones with exact status text", async () => {

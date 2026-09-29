@@ -1,5 +1,31 @@
 # ContractorProof — Frontend Status
 
+## Task 8 state: Contractor Passport UI
+
+The existing `/passports` route now consumes the authenticated, backend-derived Passport projection. The list calls `GET /api/v1/passports`; the existing `/passports/:projectId` route calls `GET /api/v1/passports/:projectId` with the project ID expected by the backend. Both envelopes are strictly parsed; malformed rows fail visibly rather than becoming partial or empty records.
+
+- The list presents only returned contractor and project fields, with navigation to each project Passport.
+- The detail presents contractor registration fields, project references and dates, milestones and policy metadata, evidence IDs/status, every ordered evidence version and SHA-256, per-version verification records, returned attestations and proof, correction originals/corrected versions/resolutions, variation snapshots/reviews/resolutions, and project proof events.
+- Historical evidence versions remain separate and are labelled current or historical by comparing their IDs to the backend `currentVersionId`; the backend-provided ordered versions are not collapsed or replaced.
+- Verification remains exactly `MATCH`, `MISMATCH`, `PENDING`, or `UNAVAILABLE`. Proof is `CONFIRMED` only with a transaction hash and positive block number, `PENDING` for returned partial proof metadata, and `NO PROOF` when no proof is included.
+- Hashes remain fully visible, wrap within narrow layouts, and have accessible copy controls. No explorer URLs, scores, rankings, trust labels, or inferred contractor assessments are added.
+- The shared query presentation preserves loading, successful empty, 401 sign-in-required, 403 forbidden, 404 not-found, retryable API error, and malformed-data behavior. The backend continues to enforce Passport access.
+
+### Backend projection limitations
+
+- Passport evidence DTOs do not return original filenames or MIME/size metadata, so the screen uses backend evidence/version identifiers rather than inventing file labels.
+- The current Passport projection does not include dispute records. This screen does not call a separate disputes endpoint or infer dispute history.
+- Attestation DTOs expose decision, verifier role, IDs, policy ID, timestamp, and related proof, but not comments or verifier identities; only the returned safe fields are shown.
+- Live backend health returned HTTP 200 and unauthenticated `GET /api/v1/passports` returned HTTP 401 as expected. The protected Passport page redirected to sign-in in the browser because no user bearer token was available; authenticated visual rendering and live CRUD behavior are not claimed.
+
+### Verification summary
+
+- Passport API and UI tests: 19/19 passed.
+- Relevant backend Passport tests: 8/8 passed.
+- Frontend lint: PASS. Production build and TypeScript compilation: PASS.
+- Full frontend suite with `VITE_API_ORIGIN=http://127.0.0.1:65534 npm test`: 29/29 files and 213/213 tests passed.
+- Plain `npm test` while the local backend is running returned 211/213: an existing milestone-create test makes an unmocked project read using a seeded fake token, receives the live backend's 401, and reaches the session-expired screen. The test passes with the API origin isolated; Task 8 does not change that workflow.
+
 ## Task 5.5 state: UI polish, icon system, and visual refinement
 
 The frontend presentation layer has been visually refined without changing the backend contract, router permissions, auth model, verification logic, or evidence hashing behavior. The app continues to rely on the real API payloads and the established route structure; this pass is limited to consistent iconography, stronger layout hierarchy, and more usable presentation states.

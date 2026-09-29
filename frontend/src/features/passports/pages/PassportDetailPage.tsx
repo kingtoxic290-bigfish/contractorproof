@@ -1,93 +1,76 @@
+import { ArrowLeft, ContactRound } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { Card } from "../../../components/ui/Card";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { QueryPanel } from "../../shared/QueryPanel";
 import { PassportTimeline } from "../components/PassportTimeline";
 import { ProjectHistoryCard } from "../components/ProjectHistoryCard";
-import { UnavailableModule } from "../components/UnavailableModule";
-import { useContractorHistory } from "../hooks/useContractorHistory";
-import { buildTimeline } from "../types";
+import { useOfficialProjectPassport } from "../hooks/useOfficialProjectPassport";
 
 export function PassportDetailPage() {
-  const { contractorId } = useParams();
-  const { status, data, error, retry } = useContractorHistory(contractorId);
-  const timeline = data ? buildTimeline(data) : [];
+  const { projectId } = useParams();
+  const passport = useOfficialProjectPassport(projectId);
 
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Contractor project history"
-        description="History is assembled from GET /contractors/:id, GET /projects, GET /projects/:projectId/milestones, and GET /evidence. GET /passports/:projectId is not implemented. This is not a contractor score."
+        title="Contractor Passport"
+        description="A derived record of contractor, project, evidence, verification, proof, and related history returned by the backend."
+        icon={ContactRound}
       />
-      <p>
-        <Link
-          to="/passports"
-          className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
-        >
-          Back to passports
-        </Link>
-      </p>
+      <Link
+        to="/passports"
+        className="inline-flex items-center gap-2 text-sm font-semibold text-teal-900 underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+      >
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to passports
+      </Link>
 
       <QueryPanel
-        status={status}
-        error={error}
-        onRetry={() => void retry()}
-        loadingMessage="Loading project history..."
+        status={passport.status}
+        error={passport.error}
+        onRetry={() => void passport.retry()}
+        loadingMessage="Loading contractor passport..."
       >
-        {data ? (
+        {passport.data ? (
           <div className="space-y-6">
-            <Card title={data.contractor.legalName}>
-              <dl className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs uppercase tracking-wide text-stone-500">Account</dt>
-                  <dd className="mt-1 text-sm text-stone-900">{data.contractor.user.fullName}</dd>
+            <Card title="Contractor" description="Identity and registration fields included in this Passport projection." icon={ContactRound}>
+              <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="min-w-0">
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">Legal name</dt>
+                  <dd className="mt-1 break-words text-sm font-semibold text-stone-900">{passport.data.contractor.legalName}</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">Contractor ID</dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-stone-900">{passport.data.contractor.id}</dd>
+                </div>
+                <div className="min-w-0">
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">CRB registration</dt>
+                  <dd className="mt-1 break-words text-sm text-stone-900">{passport.data.contractor.crbRegistrationNumber ?? "Not provided"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-stone-500">CRB registration</dt>
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">CRB category / type / class</dt>
                   <dd className="mt-1 text-sm text-stone-900">
-                    {data.contractor.crbRegistrationNumber ?? "Not provided"}
+                    {[passport.data.contractor.crbCategory, passport.data.contractor.crbType, passport.data.contractor.crbClass]
+                      .filter((value): value is string => value !== null).join(" / ") || "Not provided"}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase tracking-wide text-stone-500">CRB status</dt>
-                  <dd className="mt-1 text-sm text-stone-900">
-                    {data.contractor.crbStatus ?? "Not provided"}
-                  </dd>
+                  <dd className="mt-1 text-sm text-stone-900">{passport.data.contractor.crbStatus ?? "Not provided"}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase tracking-wide text-stone-500">Record created</dt>
-                  <dd className="mt-1 text-sm text-stone-900">{data.contractor.createdAt}</dd>
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">CRB last verified</dt>
+                  <dd className="mt-1 text-sm text-stone-900">{passport.data.contractor.crbLastVerifiedAt ?? "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-stone-500">CRB source</dt>
+                  <dd className="mt-1 text-sm text-stone-900">{passport.data.contractor.crbSource ?? "Not provided"}</dd>
                 </div>
               </dl>
-              <p className="mt-3">
-                <Link
-                  to={`/contractors/${encodeURIComponent(data.contractor.id)}`}
-                  className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
-                >
-                  Open contractor record
-                </Link>
-              </p>
             </Card>
 
-            <UnavailableModule
-              title="Official passport projection"
-              endpoint="GET /api/v1/passports/:projectId"
-            >
-              GET /api/v1/passports/:projectId is not implemented (501). This page does not invent a
-              passport document, trust score, or blockchain confirmation.
-            </UnavailableModule>
-
-            <PassportTimeline events={timeline} />
-
-            {data.projects.length === 0 ? (
-              <Card title="Projects">
-                <p className="text-sm text-stone-600">
-                  GET /api/v1/projects returned no projects with this contractorId.
-                </p>
-              </Card>
-            ) : (
-              data.projects.map((entry) => <ProjectHistoryCard key={entry.project.id} entry={entry} />)
-            )}
+            <ProjectHistoryCard passport={passport.data} />
+            <PassportTimeline passport={passport.data} />
           </div>
         ) : null}
       </QueryPanel>

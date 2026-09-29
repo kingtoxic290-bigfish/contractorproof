@@ -1,65 +1,74 @@
+import { ArrowRight, Building2, ContactRound } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Card } from "../../../components/ui/Card";
+import { EmptyState } from "../../../components/feedback/EmptyState";
 import { PageHeader } from "../../../components/ui/PageHeader";
-import { useContractors } from "../../contractors/hooks/useContractors";
+import { Card } from "../../../components/ui/Card";
 import { QueryPanel } from "../../shared/QueryPanel";
 import { useOfficialPassport } from "../hooks/useOfficialPassport";
 
 export function PassportsPage() {
   const official = useOfficialPassport();
-  const contractors = useContractors();
+  const status = official.status === "success" && official.data?.length === 0 ? "empty" : official.status;
 
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Performance passports"
-        description="A passport is an evidence-backed project history. It is not a trust score, rating, ranking, or percentage. GET /api/v1/passports is not implemented; this index uses GET /api/v1/contractors."
+        title="Contractor Passports"
+        description="Derived project evidence records from the authorized Passport projection. These records are not ratings or assessments."
+        icon={ContactRound}
       />
-
-      <Card
-        title="Official passport projection"
-        description="The backend registers GET /api/v1/passports and GET /api/v1/passports/:projectId as JWT-authenticated 501 stubs. No derived passport document is returned."
+      <QueryPanel
+        status={status}
+        error={official.error}
+        onRetry={() => void official.retry()}
+        loadingMessage="Loading contractor passports..."
+        emptyTitle="No passport records available."
+        emptyDescription="The backend returned no project passport records accessible to this account."
       >
-        <QueryPanel
-          status={official.status}
-          error={official.error}
-          onRetry={() => void official.retry()}
-          loadingMessage="Checking the passport projection..."
-        >
-          <p className="text-sm text-stone-600">
-            The passport projection returned a body that is not in a known format. No passport
-            fields are shown.
-          </p>
-        </QueryPanel>
-      </Card>
-
-      <Card
-        title="Contractor project history"
-        description="Open a contractor to see projects, milestones, and evidence returned by implemented GET APIs. This is not GET /passports."
-      >
-        <QueryPanel
-          status={contractors.status}
-          error={contractors.error}
-          onRetry={() => void contractors.retry()}
-          loadingMessage="Loading contractor information..."
-          emptyTitle="No contractors available."
-          emptyDescription="GET /api/v1/contractors returned no records."
-        >
-          <ul className="grid gap-3">
-            {contractors.records.map((contractor) => (
-              <li key={contractor.id}>
-                <Link
-                  to={`/passports/${encodeURIComponent(contractor.id)}`}
-                  className="block rounded-md border border-stone-200 px-3 py-3 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
-                >
-                  <p className="text-sm font-medium text-stone-900">{contractor.legalName}</p>
-                  <p className="mt-1 text-sm text-stone-600">{contractor.user.fullName}</p>
-                </Link>
-              </li>
+        {official.data ? (
+          <div className="space-y-4">
+            {official.data.map(({ contractor, project, milestones, blockchainProofs }) => (
+              <Card key={project.id} icon={Building2}>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{contractor.legalName}</p>
+                    <h2 className="mt-1 font-serif text-xl text-stone-900">{project.name}</h2>
+                    <p className="mt-2 break-all font-mono text-xs text-stone-500">Project ID: {project.id}</p>
+                    <p className="mt-1 text-sm text-stone-600">
+                      {project.contractStatus ?? "Contract status not provided"}
+                      {project.procuringEntity ? ` · ${project.procuringEntity}` : ""}
+                    </p>
+                  </div>
+                  <Link
+                    to={`/passports/${encodeURIComponent(project.id)}`}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-800 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+                  >
+                    Open passport <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                </div>
+                <dl className="mt-4 grid gap-3 border-t border-stone-200 pt-4 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-stone-500">Milestones</dt>
+                    <dd className="mt-1 text-sm font-semibold tabular-nums text-stone-900">{milestones.length}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-stone-500">Evidence records</dt>
+                    <dd className="mt-1 text-sm font-semibold tabular-nums text-stone-900">
+                      {milestones.reduce((count, milestone) => count + milestone.evidence.length, 0)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase tracking-wide text-stone-500">Blockchain proof events</dt>
+                    <dd className="mt-1 text-sm font-semibold tabular-nums text-stone-900">{blockchainProofs.length}</dd>
+                  </div>
+                </dl>
+              </Card>
             ))}
-          </ul>
-        </QueryPanel>
-      </Card>
+          </div>
+        ) : (
+          <EmptyState title="Passport records unavailable." description="The backend did not return a usable passport projection." />
+        )}
+      </QueryPanel>
     </section>
   );
 }

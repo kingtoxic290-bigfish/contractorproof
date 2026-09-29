@@ -1,239 +1,170 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { listContractors } from "../features/contractors/api/contractorsApi";
-import { getOfficialPassports, loadContractorHistory } from "../features/passports/api/passportsApi";
-import { authApi } from "../services/api/auth";
+import { getOfficialPassports, getOfficialProjectPassport } from "../features/passports/api/passportsApi";
 import { ApiError } from "../services/api/errors";
-import {
-  contractorRecord,
-  evidenceRecord,
-  milestoneRecord,
-  projectRecord,
-} from "./fixtures";
+import { authApi } from "../services/api/auth";
+import { passportFixture } from "./passportFixture";
 import { renderApp, seedSession } from "./renderApp";
 
 vi.mock("../services/api/auth", () => ({
-  authApi: {
-    me: vi.fn(),
-    login: vi.fn(),
-    register: vi.fn(),
-  },
-}));
-
-vi.mock("../features/contractors/api/contractorsApi", () => ({
-  listContractors: vi.fn(),
-  getContractor: vi.fn(),
+  authApi: { me: vi.fn(), login: vi.fn(), register: vi.fn() },
 }));
 
 vi.mock("../features/passports/api/passportsApi", () => ({
   getOfficialPassports: vi.fn(),
-  loadContractorHistory: vi.fn(),
+  getOfficialProjectPassport: vi.fn(),
 }));
-
-const contractor = contractorRecord({
-  id: "c1",
-  legalName: "Harbor Works Ltd",
-});
-const project = projectRecord({
-  id: "p1",
-  name: "Bridge deck",
-  contractorId: "c1",
-  procuringEntity: "Demo Procuring Entity",
-  contractStatus: "ACTIVE",
-});
-const milestone = milestoneRecord({
-  id: "m1",
-  name: "Foundation",
-  status: "PENDING",
-  projectId: "p1",
-});
-
-function history(verificationStatus: string, extra?: { status?: string; fileName?: string }) {
-  return {
-    contractor,
-    projects: [
-      {
-        project,
-        milestones: [milestone],
-        evidence: [
-          evidenceRecord({
-            id: "e1",
-            fileName: extra?.fileName ?? "site.jpg",
-            milestoneId: "m1",
-            status: extra?.status ?? "PENDING_VERIFICATION",
-            verificationStatus,
-          }),
-        ],
-      },
-    ],
-  };
-}
 
 function mockAuditor() {
   seedSession();
   vi.mocked(authApi.me).mockResolvedValue({
-    id: "user-2",
+    id: "auditor-1",
     email: "auditor@example.com",
     fullName: "Demo Auditor",
     role: "AUDITOR",
   });
 }
 
-describe("passports", () => {
+describe("contractor passports", () => {
   beforeEach(() => {
     mockAuditor();
-    vi.mocked(getOfficialPassports).mockRejectedValue(
-      new ApiError(501, "Not implemented in scaffold phase", "passports"),
-    );
-    vi.mocked(listContractors).mockResolvedValue([contractor]);
-    vi.mocked(loadContractorHistory).mockReset();
+    vi.mocked(getOfficialPassports).mockResolvedValue([passportFixture]);
+    vi.mocked(getOfficialProjectPassport).mockResolvedValue(passportFixture);
   });
 
-  it("shows a loading state for the official projection", async () => {
+  it("shows loading while the authorized Passport list is pending", async () => {
     vi.mocked(getOfficialPassports).mockReturnValue(new Promise(() => undefined));
     renderApp("/passports");
-    expect(await screen.findByText("Checking the passport projection...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading contractor passports...")).toBeInTheDocument();
   });
 
-  it("shows the official passport API as unavailable and lists contractors", async () => {
+  it("lists backend contractor and project records with a project Passport link", async () => {
     renderApp("/passports");
-    expect(await screen.findByText("This information is not available from the API yet.")).toBeInTheDocument();
-    expect(screen.getByText("The server reported that this resource is not implemented. No records are shown.")).toBeInTheDocument();
-    expect((await screen.findAllByText("Harbor Works Ltd")).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Contractor Score: 92")).not.toBeInTheDocument();
-    expect(screen.queryByText("Trust Score: 87%")).not.toBeInTheDocument();
-    expect(screen.queryByText("4.8/5")).not.toBeInTheDocument();
+    expect(await screen.findByText("Harbor Works Ltd")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bridge deck" })).toBeInTheDocument();
+    expect(screen.getByText("Project ID: project-1")).toBeInTheDocument();
+    expect(screen.getByText(/Demo Procuring Entity/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open passport" })).toHaveAttribute("href", "/passports/project-1");
+    expect(getOfficialPassports).toHaveBeenCalled();
   });
 
-  it("shows an empty contractor index", async () => {
-    vi.mocked(listContractors).mockResolvedValue([]);
+  it("shows an empty state for a successful empty passport list", async () => {
+    vi.mocked(getOfficialPassports).mockResolvedValue([]);
     renderApp("/passports");
-    expect(await screen.findByText("No contractors available.")).toBeInTheDocument();
+    expect(await screen.findByText("No passport records available.")).toBeInTheDocument();
   });
 
-  it("loads contractor project history", async () => {
-    vi.mocked(loadContractorHistory).mockReturnValue(new Promise(() => undefined));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("Loading project history...")).toBeInTheDocument();
-  });
-
-  it("renders project, milestone, and evidence history without inventing scores", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue(history("PENDING"));
-    renderApp("/passports/c1");
-
-    expect((await screen.findAllByText("Harbor Works Ltd")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Bridge deck").length).toBeGreaterThan(0);
+  it("renders contractor, project, milestones, and historical evidence versions", async () => {
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("CRB-204")).toBeInTheDocument();
+    expect(screen.getByText("CRB_LOOKUP")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bridge deck" })).toBeInTheDocument();
+    expect(screen.getByText("TN-204 / CT-204")).toBeInTheDocument();
     expect(screen.getAllByText("Foundation").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("site.jpg").length).toBeGreaterThan(0);
-    expect(screen.getByText("Demo Procuring Entity")).toBeInTheDocument();
+    expect(screen.getByText("Evidence Version 1 · historical")).toBeInTheDocument();
+    expect(screen.getByText("Evidence Version 2 · current")).toBeInTheDocument();
+    expect(screen.getByText("Evidence evidence-1")).toBeInTheDocument();
+    expect(getOfficialProjectPassport).toHaveBeenCalledWith("project-1");
+  });
+
+  it("shows complete SHA-256 values and offers accessible copy controls", async () => {
+    renderApp("/passports/project-1");
+    const hashes = await screen.findAllByText("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    expect(hashes.some((hash) => hash.classList.contains("break-all"))).toBe(true);
+    expect(screen.getAllByRole("button", { name: "Copy SHA-256" }).length).toBeGreaterThan(0);
+  });
+
+  it("preserves all four canonical verification states as technical results", async () => {
+    renderApp("/passports/project-1");
+    for (const state of ["MATCH", "MISMATCH", "PENDING", "UNAVAILABLE"]) {
+      expect(await screen.findAllByText(state)).not.toHaveLength(0);
+    }
+    expect(screen.getByText("Verification MISMATCH")).toBeInTheDocument();
+    expect(screen.queryByText(/fraudulent|dishonest|unsafe|untrustworthy/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/trusted contractor|Trust Score|reputation score/i)).not.toBeInTheDocument();
+  });
+
+  it("distinguishes confirmed, pending, and absent proof using transaction and block metadata", async () => {
+    renderApp("/passports/project-1");
+    expect((await screen.findAllByText("CONFIRMED")).length).toBeGreaterThan(0);
     expect(screen.getAllByText("PENDING").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("PENDING_VERIFICATION").length).toBeGreaterThan(0);
-    expect(screen.getByText("Verification is pending.")).toBeInTheDocument();
-    expect(screen.getByText("Contractor record created")).toBeInTheDocument();
-    expect(screen.getByText("Project registered")).toBeInTheDocument();
-    expect(screen.getByText("Milestone recorded")).toBeInTheDocument();
-    expect(screen.getByText("Evidence uploaded")).toBeInTheDocument();
-    expect(screen.queryByText(/Site Handover|Blockchain Anchor|Contract Award/)).not.toBeInTheDocument();
-    expect(screen.queryByText("Contractor Score: 92")).not.toBeInTheDocument();
-    expect(screen.queryByText("99% verified")).not.toBeInTheDocument();
-    expect(screen.queryByText("star rating")).not.toBeInTheDocument();
+    expect(screen.getAllByText("NO PROOF").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("22").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(`0x${"1".repeat(64)}`).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/explorer|RPC|private key/i)).not.toBeInTheDocument();
   });
 
-  it("keeps MATCH as MATCH", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue(history("MATCH"));
-    renderApp("/passports/c1");
-    expect((await screen.findAllByText("MATCH")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Evidence fingerprint matches the recorded integrity value.")).toBeInTheDocument();
-    expect(screen.queryByText("Document is genuine.")).not.toBeInTheDocument();
+  it("renders only safe attestation fields returned by the Passport", async () => {
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("Attestations (1)")).toBeInTheDocument();
+    expect(screen.getAllByText("APPROVED").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("AUDITOR").length).toBeGreaterThan(0);
+    expect(screen.getByText("attestation-1")).toBeInTheDocument();
+    expect(screen.queryByText(/comment|verifierId/i)).not.toBeInTheDocument();
   });
 
-  it("keeps MISMATCH as MISMATCH", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue(history("MISMATCH"));
-    renderApp("/passports/c1");
-    expect((await screen.findAllByText("MISMATCH")).length).toBeGreaterThan(0);
-    expect(
-      screen.getByText("Evidence fingerprint does not match the recorded integrity value."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/fraud|trustworthy|honest/i)).not.toBeInTheDocument();
-    expect(screen.queryByText("MATCH")).not.toBeInTheDocument();
+  it("preserves correction, variation snapshots, resolutions, and dated record history", async () => {
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("Corrections (1)")).toBeInTheDocument();
+    expect(screen.getByText("Corrected evidence versions")).toBeInTheDocument();
+    expect(screen.getAllByText("Retain both evidence versions in the record.").length).toBeGreaterThan(0);
+    expect(screen.getByText("Variation VAR-01")).toBeInTheDocument();
+    expect(screen.getByText("Original state")).toBeInTheDocument();
+    expect(screen.getByText(/Bridge deck revision/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Record history" })).toBeInTheDocument();
+    expect(screen.getByText("Evidence version 1 recorded")).toBeInTheDocument();
+    expect(screen.getByText("Variation resolution RESOLVED")).toBeInTheDocument();
   });
 
-  it("keeps UNAVAILABLE as UNAVAILABLE", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue(history("UNAVAILABLE"));
-    renderApp("/passports/c1");
-    expect((await screen.findAllByText("UNAVAILABLE")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Verification result is currently unavailable.")).toBeInTheDocument();
+  it("keeps project detail content responsive-safe for long identifiers and hashes", async () => {
+    renderApp("/passports/project-1");
+    await screen.findByText("Harbor Works Ltd");
+    expect(screen.getByText("project-1")).toHaveClass("break-all");
+    expect(screen.getAllByText("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").some((element) => element.classList.contains("break-all"))).toBe(true);
   });
 
-  it("does not invent attestation decisions or blockchain anchors", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue(history("PENDING"));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("Attestations")).toBeInTheDocument();
-    expect(screen.getByText(/GET \/api\/v1\/attestations is not implemented/)).toBeInTheDocument();
-    expect(screen.getByText("Blockchain proof")).toBeInTheDocument();
-    expect(screen.getByText(/GET \/api\/v1\/blockchain is not implemented/)).toBeInTheDocument();
-    expect(screen.queryByText("APPROVED")).not.toBeInTheDocument();
-    expect(screen.queryByText("REJECTED")).not.toBeInTheDocument();
-    expect(screen.queryByText("Status: Anchored")).not.toBeInTheDocument();
-    expect(screen.queryByText(/0x[a-f0-9]{16}/i)).not.toBeInTheDocument();
+  it("shows loading while an individual project Passport is pending", async () => {
+    vi.mocked(getOfficialProjectPassport).mockReturnValue(new Promise(() => undefined));
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("Loading contractor passport...")).toBeInTheDocument();
   });
 
-  it("shows an empty project history", async () => {
-    vi.mocked(loadContractorHistory).mockResolvedValue({ contractor, projects: [] });
-    renderApp("/passports/c1");
-    expect(
-      await screen.findByText("GET /api/v1/projects returned no projects with this contractorId."),
-    ).toBeInTheDocument();
+  it("shows a genuine empty message when no nested history was returned", async () => {
+    vi.mocked(getOfficialProjectPassport).mockResolvedValue({
+      ...passportFixture,
+      milestones: [],
+      variations: [],
+      blockchainProofs: [],
+    });
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("No milestones were returned in this Passport projection.")).toBeInTheDocument();
+    expect(screen.getByText("No variation records were returned for this project.")).toBeInTheDocument();
+    expect(screen.getByText("No blockchain proof events were returned for this project.")).toBeInTheDocument();
   });
 
-  it("handles unauthorized access", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(401, "missing bearer token"));
-    renderApp("/passports/c1");
+  it("handles a 401 with sign-in-required behavior", async () => {
+    vi.mocked(getOfficialProjectPassport).mockRejectedValue(new ApiError(401, "unauthenticated"));
+    renderApp("/passports/project-1");
     expect(await screen.findByText("You need to sign in to view this information.")).toBeInTheDocument();
   });
 
-  it("handles forbidden access", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(403, "insufficient permission"));
-    renderApp("/passports/c1");
-    expect(
-      await screen.findByText("You do not have permission to view this information."),
-    ).toBeInTheDocument();
+  it("handles a 403 as forbidden without treating it as a sign-out", async () => {
+    vi.mocked(getOfficialProjectPassport).mockRejectedValue(new ApiError(403, "forbidden"));
+    renderApp("/passports/project-1");
+    expect(await screen.findByText("You do not have permission to view this information.")).toBeInTheDocument();
+    expect(screen.queryByText("You need to sign in to view this information.")).not.toBeInTheDocument();
   });
 
-  it("handles a missing contractor", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(404, "contractor not found"));
-    renderApp("/passports/c1");
+  it("handles a 404 as a missing Passport record", async () => {
+    vi.mocked(getOfficialProjectPassport).mockRejectedValue(new ApiError(404, "not found"));
+    renderApp("/passports/missing-project");
     expect(await screen.findByText("The requested record was not found.")).toBeInTheDocument();
   });
 
-  it("handles a server error", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(500, "internal server error"));
-    renderApp("/passports/c1");
+  it("preserves retry behavior for other backend errors", async () => {
+    vi.mocked(getOfficialProjectPassport).mockRejectedValue(new ApiError(500, "internal error"));
+    renderApp("/passports/project-1");
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
-  });
-
-  it("handles a temporary outage", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(503, "service unavailable"));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("The service is temporarily unavailable.")).toBeInTheDocument();
-  });
-
-  it("handles a network failure", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new TypeError("Failed to fetch"));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("We couldn't reach the server. Please try again.")).toBeInTheDocument();
-  });
-
-  it("handles a conflict", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(409, "conflict"));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("This request conflicts with an existing record.")).toBeInTheDocument();
-  });
-
-  it("handles an unprocessable request", async () => {
-    vi.mocked(loadContractorHistory).mockRejectedValue(new ApiError(422, "unprocessable"));
-    renderApp("/passports/c1");
-    expect(await screen.findByText("The server could not accept this information.")).toBeInTheDocument();
   });
 });

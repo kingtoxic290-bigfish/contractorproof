@@ -49,10 +49,10 @@ export function ProjectDetailPage() {
                 Create milestone
               </Link>
               <Link
-                to={`/passports/${encodeURIComponent(project.data.contractorId)}`}
+                to={`/passports/${encodeURIComponent(project.data.id)}`}
                 className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
               >
-                View contractor project history
+                View project Passport
               </Link>
             </div>
           </Card>

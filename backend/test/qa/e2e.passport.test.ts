@@ -101,7 +101,8 @@ describe("passport and public verification", () => {
       path.join(frontendRoot, "features/verification/types.ts"),
       "utf8",
     );
-    expect(passportsApi).toMatch(/GET \/api\/v1\/passports → 501/);
+    expect(passportsApi).toMatch(/apiRequest<unknown>\("\/passports"\)/);
+    expect(passportsApi).toMatch(/apiRequest<unknown>\(`\/passports\/\$\{encodeURIComponent\(projectId\)\}`\)/);
     expect(passportsApi).not.toMatch(/trustScore|securityScore|99\.8%|100% verified/);
     expect(verificationTypes).toMatch(/MATCH.*MISMATCH.*PENDING.*UNAVAILABLE/s);
     expect(verificationTypes).not.toMatch(/trustScore|securityScore|VERIFIED/);
