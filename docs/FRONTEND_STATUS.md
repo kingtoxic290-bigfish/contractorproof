@@ -324,8 +324,21 @@ It does not yet have:
 
 This is an appropriate starting baseline for Task 1, which is to establish a consistent design system and app shell without redesigning the backend or inventing unsupported functionality.
 
+## Task 7 state: Blockchain proof and attestation UI
+
+The protected verification page presents the actual backend contract flow without collapsing verification, blockchain proof, and attestation into one status.
+
+- Verification uses the authenticated `POST /api/v1/verification` route and keeps the canonical backend state values: `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`.
+- Blockchain proof is rendered only from the returned `data.proof` object, with `CONFIRMED` reserved for a transaction hash plus a positive block number, `PENDING` for partial or unconfirmed proof metadata, and `NO PROOF` when the backend returns no proof block.
+- Attestation uses the authenticated `POST /api/v1/attestations` route and shows the safe fields the API intentionally exposes: decision, verifier role, created timestamp, evidence identifier, milestone identifier, attestation identifier, and optional comment.
+- The frontend hides controls for roles that are not allowed to attest, but the backend remains authoritative for authorization decisions. `CONTRACTOR` is intentionally excluded from the attestation action, matching the backend role gate.
+- The backend already exposes `GET /api/v1/attestations` for authorized readers, so this task intentionally keeps the UI focused on the current attestation flow instead of fabricating a historical list view in the verification surface.
+- Requests clear prior results while verifying. Safe handling covers 400, 401, 403, 404, 409, 422, server, and network errors; no internal paths, provider details, database errors, or secrets are shown.
+
+The implementation is aligned to the actual backend contracts and stays within the task scope: verification and proof are distinct, attestation is distinct, and the frontend does not invent blockchain or attestation data.
+
 ## Task 6 state: Internal verification UI wired to the real backend
 
 The protected verification page uses `POST /api/v1/verification` only. It accepts backend-defined evidence IDs, sending JSON for stored-byte comparison or multipart `file` data for presented-file comparison. It validates `{ data: { verification, proof }, meta }`, preserves only `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE`, and shows the backend SHA-256 with a copy action.
 
-Requests clear prior results while verifying. Safe handling covers 400, 401, 403, 404, 409, server, and network errors; no internal paths, provider details, database errors, or secrets are shown. There is no verification-history endpoint, so none is fabricated. Returned proof metadata is limited to `CONFIRMED`, `PENDING`, or `NO PROOF`; detailed proof presentation is deferred to Task 7.
+Requests clear prior results while verifying. Safe handling covers 400, 401, 403, 404, 409, server, and network errors; no internal paths, provider details, database errors, or secrets are shown. There is no verification-history endpoint, so none is fabricated. Returned proof metadata is limited to `CONFIRMED`, `PENDING`, or `NO PROOF`; detailed proof presentation is included in the Task 7 section above.

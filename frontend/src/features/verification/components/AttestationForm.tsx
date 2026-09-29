@@ -92,7 +92,7 @@ export function AttestationForm({
   return (
     <Card
       title="Attest evidence"
-      description="POST /api/v1/attestations records APPROVED or REJECTED. GET /api/v1/attestations is not implemented (501), so prior attestations are not listed."
+      description="POST /api/v1/attestations records APPROVED or REJECTED. Authorized readers may also call GET /api/v1/attestations; this task intentionally does not fabricate prior attestations in the current form."
     >
       <form
         className="space-y-4"

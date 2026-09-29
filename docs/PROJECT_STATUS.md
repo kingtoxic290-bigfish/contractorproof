@@ -4,51 +4,28 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 8 — Blockchain Proof History & Reconciliation
+TASK 7 — Blockchain Proof & Attestation UI
 
 ## STATUS
 
 COMPLETE
 
-`GET /api/v1/blockchain` now returns safe proof history under the existing project-read boundary, optionally scoped by `projectId`. `POST /api/v1/blockchain/:eventId/reconcile` reads only an existing pending event's transaction receipt; it confirms the same row only for a successful receipt with transaction hash and positive block number. It never submits a replacement transaction, never overwrites confirmed rows, and preserves logical-key uniqueness.
+The frontend proof and attestation workflow is wired to the real backend contracts already implemented in the service layer. The verification result remains the authoritative source for `MATCH`, `MISMATCH`, `PENDING`, and `UNAVAILABLE` values; blockchain proof is shown only when `POST /api/v1/verification` returns `data.proof`, and attestation creation is handled through `POST /api/v1/attestations` only for roles allowed by the backend.
 
-No receipt, reverted receipt, provider error, or pending event without a stored transaction hash remains PENDING. The last case intentionally does not invoke generic retry because submission/retry remains owned by the existing domain orchestration. Failed transactions have no distinct persisted state in the current schema.
-
-History contains only authorized event metadata (event/project/reference IDs, type, tx hash, block number, confirmation state, timestamps). Contractors are restricted to own projects; ADMIN, AUDITOR, and PROCUREMENT_OFFICER retain privileged project-read access. Passport and public verification remain PostgreSQL projections and reflect a later reconciliation on their next read.
+The UI distinguishes verification from blockchain proof from attestation rather than collapsing them into a single outcome. `CONFIRMED` is shown only for a returned transaction hash with a positive block number; partial transaction metadata stays `PENDING`, and a missing proof is displayed as `NO PROOF`. `MISMATCH` does not imply fraud or unsafe status; it only means the submitted fingerprint did not match the authoritative record.
 
 TESTS:
 
-* Focused history/reconciliation and blockchain service/repository tests — 10/10 PASS
-* Public verification, verification, attestation, Passport, variation, correction, and dispute regressions — PASS
-* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — PASS
-* `npx tsc --noEmit` — PASS
-* `npx prisma validate` — PASS
-* Hardhat and live backend blockchain tests — PASS
+* Focused verification, proof, and attestation UI tests — PASS
+* Full frontend suite (`cd frontend && npm test -- --run`) — PASS
+* Production build (`cd frontend && npm run build`) — PASS
+* Existing backend verification/attestation regressions remain unchanged because no backend code was modified
 
-KNOWN LIMITATIONS: a pending event without a transaction hash cannot be generically reconciled safely and remains pending; the schema intentionally has no separate failed state.
+KNOWN LIMITATIONS:
 
----
-
-## TASK 7 — Public Verification
-
-## STATUS
-
-COMPLETE
-
-`POST /api/v1/public/verify` remains unauthenticated and accepts multipart `file` plus `evidenceId` or `evidenceVersionId`. It hashes through the canonical evidence verification service and now checks the persisted VERIFICATION BlockchainEvent. MATCH/MISMATCH require a confirmed event whose transaction hash, positive block number, and anchored hash agree with the stored EvidenceVersion. Pending/unconfirmed events return PENDING; missing or inconsistent proof returns UNAVAILABLE. The response contains only the established evidence-version reference, canonical state and meaning, and a confirmed flag with transaction hash/block number when confirmed. Unknown references remain UNAVAILABLE to limit enumeration; no project/contractor or storage details are returned.
-
-The endpoint does not authenticate callers by design; private project and evidence APIs retain their existing authentication/access controls. The public API reads persisted proof state only and does not call the EVM.
-
-TESTS:
-
-* Focused public verification, evidence HTTP, and verification-state tests — 17/17 PASS
-* Verification, attestation, Passport, dispute, correction, and variation regressions — PASS
-* Full backend (`npm test -- --maxWorkers=2 --minWorkers=1`) — PASS
-* `npx tsc --noEmit` — PASS
-* `npx prisma validate` — PASS (existing Prisma package config deprecation warning)
-* Hardhat — PASS
-
-KNOWN LIMITATIONS: public verification remains file plus an existing evidence reference; hash-only lookup is intentionally unsupported. A persisted unconfirmed event is PENDING even when its receipt failed; the event model has no separate failure state.
+* The backend exposes `GET /api/v1/attestations` for authorized readers, but the Task 7 UI intentionally keeps the surface focused on the current attestation action instead of fabricating a prior-attestation history list.
+* `GET /api/v1/blockchain` is a backend history route, but the Task 7 UI shows only the proof metadata returned by the verification contract and does not invent a standalone blockchain history screen.
+* No private keys, provider configuration, or storage paths are displayed.
 
 ---
 
