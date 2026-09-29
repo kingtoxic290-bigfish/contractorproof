@@ -22,15 +22,31 @@ export function RoleAwareNav({
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "rounded-md px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800",
+              "group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800",
               isActive
-                ? "bg-teal-900 text-white"
-                : "text-stone-700 hover:bg-stone-100",
+                ? "border-teal-900 bg-teal-900 text-white shadow-sm"
+                : "border-transparent bg-transparent text-stone-700 hover:border-stone-200 hover:bg-stone-100",
             )
           }
         >
-          <span className="block font-medium">{item.label}</span>
-          <span className={cn("block text-xs", "opacity-80")}>{item.hint}</span>
+          {({ isActive }) => (
+            <>
+              <span
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg border",
+                  isActive
+                    ? "border-white/20 bg-white/10 text-white"
+                    : "border-stone-200 bg-stone-100 text-stone-700 group-hover:border-stone-300 group-hover:bg-stone-200",
+                )}
+              >
+                <item.icon className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-medium">{item.label}</span>
+                <span className={cn("block text-xs", isActive ? "text-teal-50" : "text-stone-500")}>{item.hint}</span>
+              </span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>

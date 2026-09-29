@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useId, useState } from "react";
+import { FileText, UploadCloud } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { ErrorState } from "../../../components/feedback/ErrorState";
@@ -164,6 +165,7 @@ export function EvidenceUpload({
     <Card
       title="Upload evidence"
       description="Attach a file to an existing milestone. The file is stored, fingerprinted with SHA-256, and recorded as PENDING_VERIFICATION. Upload is not verification."
+      icon={UploadCloud}
     >
       <form className="grid gap-4" onSubmit={onSubmit} noValidate>
         <div
@@ -229,25 +231,43 @@ export function EvidenceUpload({
           </select>
         </label>
 
-        <label className="block text-sm" htmlFor={fileInputId}>
-          <span className="mb-1 block font-medium text-stone-800">Evidence file</span>
-          <input
-            id={fileInputId}
-            type="file"
-            accept={EVIDENCE_ACCEPT}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
-            onChange={(event) => {
-              setFile(event.target.files?.[0] ?? null);
-              reset();
-            }}
-            required
-          />
-        </label>
+        <div className="rounded-2xl border-2 border-dashed border-stone-300 bg-stone-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0f3d3a] shadow-sm">
+              <UploadCloud className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-stone-900">Evidence file</p>
+              <p className="mt-1 text-sm text-stone-600">Choose a document to attach to the selected milestone.</p>
+            </div>
+          </div>
+
+          <label className="mt-4 block text-sm" htmlFor={fileInputId}>
+            <span className="mb-1 block font-medium text-stone-800">Evidence file</span>
+            <input
+              id={fileInputId}
+              type="file"
+              accept={EVIDENCE_ACCEPT}
+              className="block w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 file:mr-3 file:rounded-md file:border-0 file:bg-[#0f3d3a] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                reset();
+              }}
+              required
+            />
+          </label>
+        </div>
 
         {file ? (
-          <p className="text-sm text-stone-700">
-            Selected {file.name} · {file.type || "unknown type"} · {formatFileSize(file.size)}
-          </p>
+          <div className="flex items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-stone-700 shadow-sm">
+              <FileText className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium text-stone-900">Selected {file.name}</p>
+              <p className="text-xs text-stone-600">{file.type || "unknown type"} · {formatFileSize(file.size)}</p>
+            </div>
+          </div>
         ) : (
           <p className="text-sm text-stone-600">
             Allowed types: PDF, JPEG, PNG, WebP, TIFF, GIF, DOCX, XLSX, CSV, TXT. Maximum size 25 MB.

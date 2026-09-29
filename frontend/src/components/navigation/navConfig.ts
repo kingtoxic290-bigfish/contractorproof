@@ -1,3 +1,18 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Building2,
+  ClipboardCheck,
+  FileCheck,
+  FilePenLine,
+  Flag,
+  FolderKanban,
+  GitBranch,
+  LayoutDashboard,
+  Scale,
+  Settings2,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
 import type { Role } from "../../types/roles";
 
 export type NavItem = {
@@ -5,31 +20,34 @@ export type NavItem = {
   label: string;
   hint: string;
   roles?: Role[];
+  icon: LucideIcon;
 };
 
 export const APP_NAV: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", hint: "Workspace overview" },
-  { to: "/contractors", label: "Contractors", hint: "Registered contractor records" },
-  { to: "/projects", label: "Projects", hint: "Project and milestone references" },
-  { to: "/milestones", label: "Milestones", hint: "Project milestone records" },
-  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and hashes" },
+  { to: "/dashboard", label: "Dashboard", hint: "Workspace overview", icon: LayoutDashboard },
+  { to: "/contractors", label: "Contractors", hint: "Registered contractor records", icon: Users },
+  { to: "/projects", label: "Projects", hint: "Project and milestone references", icon: Building2 },
+  { to: "/milestones", label: "Milestones", hint: "Project milestone records", icon: Flag },
+  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and hashes", icon: FileCheck },
   {
     to: "/verification",
     label: "Verification",
     hint: "Evidence comparison and policy outcomes",
     roles: ["CONSULTANT_ENGINEER", "CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
+    icon: ShieldCheck,
   },
-  { to: "/passports", label: "Passport", hint: "Project evidence history" },
-  { to: "/disputes", label: "Disputes", hint: "Open and resolved disputes" },
-  { to: "/corrections", label: "Corrections", hint: "Append-only correction events" },
-  { to: "/variations", label: "Variations", hint: "Linked contract variations" },
+  { to: "/passports", label: "Passport", hint: "Project evidence history", icon: FolderKanban },
+  { to: "/disputes", label: "Disputes", hint: "Open and resolved disputes", icon: Scale },
+  { to: "/corrections", label: "Corrections", hint: "Append-only correction events", icon: FilePenLine },
+  { to: "/variations", label: "Variations", hint: "Linked contract variations", icon: GitBranch },
   {
     to: "/audit",
     label: "Audit trail",
     hint: "System and event audit records",
     roles: ["AUDITOR", "ADMIN", "PROCUREMENT_OFFICER"],
+    icon: ClipboardCheck,
   },
-  { to: "/settings", label: "Settings", hint: "Account and workspace settings" },
+  { to: "/settings", label: "Settings", hint: "Account and workspace settings", icon: Settings2 },
 ];
 
 export const PAGE_TITLES: Record<string, string> = {

@@ -1,4 +1,15 @@
 import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  BadgeCheck,
+  Building2,
+  Clock3,
+  FileCheck2,
+  Flag,
+  Link2,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/feedback/EmptyState";
 import { ErrorState } from "../components/feedback/ErrorState";
@@ -45,28 +56,34 @@ function dashboardErrorMessage(error: unknown): string {
   return "Dashboard records are currently unavailable. Please try again.";
 }
 
-function CountCard({ title, count }: { title: string; count: number }) {
+function CountCard({ title, count, icon: Icon }: { title: string; count: number; icon: LucideIcon }) {
   return (
-    <Card title={title}>
-      <p className="text-3xl font-semibold tabular-nums text-stone-900">
-        {new Intl.NumberFormat().format(count)}
-      </p>
+    <Card icon={Icon}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-stone-500">{title}</p>
+          <p className="mt-2 text-3xl font-semibold tabular-nums text-stone-900">
+            {new Intl.NumberFormat().format(count)}
+          </p>
+        </div>
+      </div>
     </Card>
   );
 }
 
 function VerificationCount({ status, count }: { status: VerificationState; count: number }) {
-  const tone = {
-    MATCH: "border-green-800 bg-green-50 text-green-900",
-    MISMATCH: "border-red-800 bg-red-50 text-red-900",
-    PENDING: "border-amber-800 bg-amber-50 text-amber-950",
-    UNAVAILABLE: "border-stone-500 bg-stone-100 text-stone-800",
+  const config = {
+    MATCH: { tone: "border-green-800 bg-green-50 text-green-900", icon: BadgeCheck },
+    MISMATCH: { tone: "border-red-800 bg-red-50 text-red-900", icon: AlertTriangle },
+    PENDING: { tone: "border-amber-800 bg-amber-50 text-amber-950", icon: Clock3 },
+    UNAVAILABLE: { tone: "border-stone-500 bg-stone-100 text-stone-800", icon: ShieldCheck },
   }[status];
+  const Icon = config.icon;
 
   return (
     <div className="flex items-center justify-between gap-4 border-b border-stone-200 py-3 last:border-b-0">
-      <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}>
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+      <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${config.tone}`}>
+        <Icon aria-hidden="true" className="h-3.5 w-3.5" />
         <span>{status}</span>
       </span>
       <span className="font-semibold tabular-nums text-stone-900">
@@ -119,21 +136,21 @@ function DashboardContent({ passports }: { passports: DashboardProjectPassport[]
   return (
     <div className="space-y-6">
       <section aria-label="Record totals" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <CountCard title="Projects" count={summary.projectCount} />
-        <CountCard title="Milestones" count={summary.milestoneCount} />
-        <CountCard title="Evidence records" count={summary.evidenceCount} />
-        <CountCard title="Verification activity" count={summary.verificationCount} />
-        <CountCard title="Attestations" count={summary.attestations.length} />
+        <CountCard title="Projects" count={summary.projectCount} icon={Building2} />
+        <CountCard title="Milestones" count={summary.milestoneCount} icon={Flag} />
+        <CountCard title="Evidence" count={summary.evidenceCount} icon={FileCheck2} />
+        <CountCard title="Verification" count={summary.verificationCount} icon={ShieldCheck} />
+        <CountCard title="Attestations" count={summary.attestations.length} icon={BadgeCheck} />
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2" aria-label="Verification and proof overview">
-        <Card title="Verification overview" description="Persisted verification results, by recorded state.">
+        <Card title="Verification overview" description="Persisted verification results, by recorded state." icon={ShieldCheck}>
           {VERIFICATION_STATES.map((status) => (
             <VerificationCount key={status} status={status} count={summary.verificationCounts[status]} />
           ))}
         </Card>
 
-        <Card title="Blockchain proof" description="Proof events establish the integrity layer only.">
+        <Card title="Blockchain proof" description="Proof events establish the integrity layer only." icon={Link2}>
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <dt className="text-sm text-stone-600">Confirmed</dt>
@@ -160,7 +177,7 @@ function DashboardContent({ passports }: { passports: DashboardProjectPassport[]
         </Card>
       </section>
 
-      <Card title="Items requiring attention" description="Factual verification states only; no intent is inferred.">
+      <Card title="Items requiring attention" description="Factual verification states only; no intent is inferred." icon={AlertTriangle}>
         {attention.length === 0 ? (
           <EmptyState title="No attention items." description="No MISMATCH, PENDING or UNAVAILABLE verification results were returned." />
         ) : (
@@ -185,7 +202,7 @@ function DashboardContent({ passports }: { passports: DashboardProjectPassport[]
         )}
       </Card>
 
-      <Card title="Projects" description="Project records returned within your backend-authorized scope.">
+      <Card title="Projects" description="Project records returned within your backend-authorized scope." icon={Building2}>
         {passports.length === 0 ? (
           <EmptyState title="No projects available." description="The backend returned no projects accessible to this account." />
         ) : (
@@ -238,7 +255,7 @@ function DashboardContent({ passports }: { passports: DashboardProjectPassport[]
         )}
       </Card>
 
-      <Card title="Recent activity" description="Chronological records returned by the project passport projection.">
+      <Card title="Recent activity" description="Chronological records returned by the project passport projection." icon={Clock3}>
         {activities.length === 0 ? (
           <EmptyState title="No recent activity available." description="No timestamped project, milestone, evidence, verification, attestation or proof records were returned." />
         ) : (

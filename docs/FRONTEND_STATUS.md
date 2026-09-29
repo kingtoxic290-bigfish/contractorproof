@@ -1,5 +1,28 @@
 # ContractorProof — Frontend Status
 
+## Task 5.5 state: UI polish, icon system, and visual refinement
+
+The frontend presentation layer has been visually refined without changing the backend contract, router permissions, auth model, verification logic, or evidence hashing behavior. The app continues to rely on the real API payloads and the established route structure; this pass is limited to consistent iconography, stronger layout hierarchy, and more usable presentation states.
+
+### Visual system and shared components
+
+- The app reuses the existing `lucide-react` dependency instead of introducing a second icon library.
+- Shared layout primitives were tightened with a stronger enterprise palette, more consistent borders, better spacing, and stronger active navigation treatment.
+- `PageHeader`, `Card`, `StatusBadge`, `LoadingState`, `EmptyState`, and `ErrorState` now use semantic icons and a consistent visual rhythm.
+- The dashboard summary cards and the evidence upload area now use clearer icons and improved information hierarchy without creating fake metrics or unsupported trust claims.
+
+### Responsive and accessibility notes
+
+- Navigation, content cards, and status badges remain keyboard-accessible and focus-visible.
+- The upload form preserves the required file label and selected-file text while improving visual clarity and readability for long filenames.
+- Existing status labels remain canonical (`MATCH`, `MISMATCH`, `PENDING`, `UNAVAILABLE`) and are not renamed or reinterpreted.
+
+### Verification summary
+
+- Frontend tests: `cd frontend && npm test -- --run` — 29/29 files passed, 217/217 tests passed.
+- Production build: `cd frontend && npm run build` — PASS.
+- Live backend smoke testing was not run because the local backend was unavailable; the task remained strictly frontend-only and respected the authoritative API contracts.
+
 ## Task 3 state: Real evidence verification dashboard
 
 The protected `/dashboard` route now renders an operational overview from the authenticated `GET /api/v1/passports` projection. It uses the centralized API client and the backend's project-scoped result; no dashboard endpoint, backend change, role-based data bypass, or synthetic product data was added.
