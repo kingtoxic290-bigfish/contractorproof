@@ -4,11 +4,27 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 9 — Public Verification UI
+TASK 10 — End-to-End Integration & Demo Validation
 
 ## STATUS
 
 COMPLETE
+
+Task 10 integration validation completed without adding product functionality. The complete frontend suite passes (240/240), focused golden-path backend API regressions pass (116/116), and the Hardhat registry suite passes (6/6). The route/API integrations for authentication, contractor selection, projects, milestones, evidence/version hashes, verification, proof/attestation, Passport, and public verification were verified through source inspection and automated UI/API tests.
+
+The local PostgreSQL container is healthy. Persistent backend/frontend development servers and an interactive browser could not be maintained in this sandbox, so no live browser journey, persistent-server HTTP smoke, or real local-EVM transaction is claimed. The local backend environment has no configured contract address or blockchain private key, and no RPC node is running; blockchain confirmation was therefore validated by backend/Hardhat tests rather than a writable demo registry.
+
+The previous “two Create Project links” report was investigated: it is intentional, comprising the sidebar navigation and the CLIENT dashboard primary action. The navigation test correctly asserts both. A stale backend contractors test was corrected to reflect the existing client project-creation flow: clients may list contractors in order to select a project assignee; no backend authorization behavior changed.
+
+TESTS:
+
+* Frontend: 31 files, 240 tests PASS; lint and production build PASS.
+* Backend golden path: 12 files, 116 tests PASS.
+* Contracts: 6 tests PASS.
+
+---
+
+## TASK 9 — Public Verification UI
 
 The public `/verify` experience now submits the backend-required multipart file and evidence reference(s) to `POST /api/v1/public/verify` without authentication. It strictly accepts the public response projection and displays only the canonical verification state, backend meaning, evidence-version reference, and confirmed proof transaction hash/block number when returned. It does not hash files, create proof state, expose internal metadata, or assess a contractor.
 

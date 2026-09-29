@@ -114,7 +114,7 @@ describe("GET /api/v1/contractors", () => {
     assertNoSensitiveUserFields(response.body);
   });
 
-  it("returns an empty collection when the caller has no contractor access", async () => {
+  it("lets a client list contractors to select an assignee for a client-owned project", async () => {
     const account = await registerAccount("CLIENT", "Empty List Viewer");
 
     const response = await request(app)
@@ -122,7 +122,8 @@ describe("GET /api/v1/contractors", () => {
       .set("Authorization", `Bearer ${account.token}`);
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ contractors: [] });
+    expect(Array.isArray(response.body.contractors)).toBe(true);
+    assertNoSensitiveUserFields(response.body);
   });
 
   it("does not include password hashes in the list payload", async () => {

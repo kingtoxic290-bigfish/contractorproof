@@ -1,5 +1,28 @@
 # ContractorProof Frontend Status
 
+## Task 10: End-to-end integration and demo validation
+
+**Status: COMPLETE WITH LIVE-DEMO LIMITATIONS**
+
+- The authenticated route sequence and API wiring were inspected across contractor, project, milestone, evidence, verification, proof, attestation, and Passport screens. Public `/verify` remains outside the authenticated shell and uses the public multipart verification endpoint.
+- The complete frontend suite passed with 240/240 tests. It covers protected/public routing, login/error behavior, navigation, project and evidence context, SHA-256 rendering, canonical verification states, proof confirmation rules, attestation UI, Passport history, and public verification handling.
+- The prior duplicate “Create Project” test finding is legitimate: a CLIENT sees both the sidebar navigation link and the dashboard’s primary action. The test now deliberately asserts two valid links; no product link was removed.
+- A local PostgreSQL container is healthy. The Task 10 process could not keep backend/frontend development servers alive in this sandbox, and no enabled browser surface was available; no live browser journey, persistent-server API smoke, or real local-EVM transaction is claimed.
+
+TESTS:
+
+* Full frontend suite — 31 files, 240 tests PASS.
+* Frontend lint and production build — PASS.
+* Golden-path backend API regressions — 12 files, 116 tests PASS.
+* Hardhat registry tests — 6 tests PASS.
+
+KNOWN LIMITATIONS:
+
+* `CONTRACT_ADDRESS` and `BLOCKCHAIN_PRIVATE_KEY` are unset in the local backend environment, and no JSON-RPC node is running. A writable blockchain proof demonstration was therefore not possible.
+* Responsive inspection was limited to automated responsive layouts/tests; interactive desktop, tablet, and mobile browser validation was unavailable.
+
+---
+
 ## Task 9: Public Verification UI
 
 **Status: COMPLETE**
