@@ -20,6 +20,7 @@ import { ProjectsPage } from "../features/projects/pages/ProjectsPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { ForbiddenPage } from "../pages/ForbiddenPage";
 import { LoginPage } from "../pages/LoginPage";
+import { NotFoundPage } from "../pages/NotFoundPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
 import { PublicVerificationPage } from "../pages/PublicVerificationPage";
 import { UnauthorizedPage } from "../pages/UnauthorizedPage";
@@ -39,6 +40,7 @@ export function AppRouter() {
         <Route path="/verify" element={<PublicVerificationPage />} />
         <Route path="/public/verify" element={<Navigate to="/verify" replace />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
 
       <Route
@@ -133,7 +135,7 @@ export function AppRouter() {
         <Route path="/forbidden" element={<ForbiddenPage />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

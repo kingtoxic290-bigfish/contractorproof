@@ -704,3 +704,72 @@ KNOWN LIMITATIONS:
 
 * Passport lists are not paginated.
 * Passport is a database snapshot; it does not query EVM state or independently revalidate transactions.
+
+---
+
+## TASK 12 — Final Presentation Polish & Demo Readiness
+
+STATUS: COMPLETE WITH LIMITATIONS
+
+SCOPE:
+
+* Frontend presentation and demo readiness only. No backend file, API contract, database
+  model, authorization rule, RBAC decision, verification semantic or blockchain semantic was
+  changed. No blockchain transaction was executed.
+
+PRESENTATION WORK:
+
+* Unified state presentation. `MATCH`, `MISMATCH`, `PENDING` and `UNAVAILABLE` now resolve to
+  one tone, one icon and one factual meaning from a single module. `StatusBadge` and
+  `VerificationStatus` previously disagreed on colour for the same four states; that split is
+  resolved. State names are unchanged.
+* Unified card, button, table, loading, empty and error primitives so radius, padding, heading
+  level, control height and message wording are consistent across the product.
+* Added route-derived breadcrumbs and a record-chain indicator (CONTRACTOR → PROJECT →
+  MILESTONE → EVIDENCE → VERIFICATION → PASSPORT). Both are derived from the URL only, so they
+  cannot display a record that was not opened and make no client-side authorization decision.
+* Evidence is presented as an auditable record: identity, content type and size, timestamps, the
+  SHA-256 fingerprint with a statement of what a hash does and does not prove, and the current
+  version explicitly marked as current. Workflow state and fingerprint-comparison state are
+  labelled separately. No filesystem path or storage detail is exposed.
+* Public verification gained a page heading, a visible four-step workflow, per-field validation
+  and focus management. It remains unauthenticated and displays a result only when one is
+  returned by the service.
+* Blockchain proof is presented as an integrity layer. Confirmed proof shows only the
+  transaction hash and block number returned by the API; an unconfirmed response says so plainly.
+  No explorer URL, hash or block number is ever constructed client-side.
+* Unknown routes now render a "Page not found" screen for both the public and authenticated route
+  trees, replacing a silent redirect to the dashboard.
+
+PRESERVED:
+
+* Verification states, names and factual meanings.
+* Backend-authoritative authorization; 403 continues to refuse without signing the user out.
+* Public verification remains unauthenticated.
+* No trust, reputation, risk, reliability or ranking score; no "trusted/safe contractor" claim.
+* No fixture or fake data added; empty states state truthfully that the service returned no
+  records.
+
+TESTS:
+
+* Frontend lint — passed.
+* Frontend tests — 31 files, 242 tests passed.
+* Frontend build — passed (TypeScript + Vite).
+* Backend tests — 37 files, 254 tests passed (unchanged; no backend file edited).
+* Hardhat — 6 passing.
+
+BROWSER VALIDATION:
+
+* Headless Chrome against a Vite dev server, DOM inspected for `/login`, `/verify` and an
+  unknown route: one `h1` per page, labelled form controls, the 404 screen renders, and no
+  horizontal overflow at 360, 390, 768 or 1280 CSS pixels.
+* NOT PERFORMED: live visual inspection of rendered screenshots (this environment cannot
+  perceive images), and authenticated screens in a real browser (the backend, database and seed
+  data were not started). No live blockchain transaction was executed.
+
+KNOWN LIMITATIONS:
+
+* The evidence DTO exposes only `currentVersion`; version history remains visible only through
+  the passport projection.
+* Some passport and variation records still render raw backend timestamps; those files were
+  outside this task's commit scope because they already contained unrelated uncommitted work.

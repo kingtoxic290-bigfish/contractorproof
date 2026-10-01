@@ -116,3 +116,72 @@ Task 7 was not started. Public verification and blockchain history/reconciliatio
 ### Task Boundary
 
 Task 6 was not started. No verification actions, evidence replacement/version-history endpoint, or blockchain workflow was added.
+
+---
+
+## Task 12 — Final Presentation Polish & Demo Readiness
+
+STATUS: COMPLETE WITH LIMITATIONS (browser-based visual inspection not performed; see Validation)
+
+### Presentation work
+
+**Shared design system**
+
+- `src/components/ui/statusTone.ts` is now the single source of truth for state presentation. `MATCH`, `MISMATCH`, `PENDING` and `UNAVAILABLE` each resolve to one tone, one icon and one factual meaning sentence. Previously `StatusBadge` and `VerificationStatus` rendered the same four states with different colours (green/red versus teal/amber); that split is resolved. State names are unchanged and are never renamed.
+- `Card`, `Section` and `Panel` now share one surface treatment (`CARD_SURFACE`) so border radius, padding and heading level no longer differ per component. `Card` accepts `headingLevel` and `actions`.
+- `Button` gained `size` so control height is consistent per size; `primary` remains reserved for the single most important action on a screen.
+- `StatusBadge` keeps an explicit text label and `aria-label`, so state is never conveyed by colour alone.
+- New `Field` / `FieldGrid` / `HashValue` and `CopyButton` components give every record page the same labelled definition-list layout, and a consistent accessible copy-to-clipboard control.
+- `src/utils/format.ts` adds presentation-only timestamp formatting and identifier shortening. It formats values the backend returned; it derives no new data.
+
+**Navigation and context**
+
+- New `Breadcrumbs` derives a trail from the current URL only, so it can never show a record that was not opened and makes no client-side authorization decision.
+- New `RecordChain` shows where the current screen sits in CONTRACTOR → PROJECT → MILESTONE → EVIDENCE → VERIFICATION → PASSPORT, with `aria-current="step"` on the active stage.
+- `PageContext` renders both in the application shell and emits nothing (and no stray spacing) where neither applies.
+- Sidebar, mobile drawer and header share one focus treatment and brand colour; the mobile drawer is now a labelled modal with a close control.
+
+**Evidence as an auditable record**
+
+- `EvidenceCard` presents evidence identity, content type and size, recorded/last-updated timestamps, the SHA-256 fingerprint with an explicit explanation of what a hash does and does not prove, and the current version explicitly marked "Current version".
+- Workflow state and fingerprint-comparison state are shown side by side and labelled separately; they are never merged into one judgement.
+- Each card links forward to its milestone, to verification for that evidence, and to the rest of the milestone's evidence.
+- No filesystem path, storage implementation detail or invented field is displayed.
+
+**Verification, blockchain and public verification**
+
+- The four verification states are rendered from the shared tone module, so internal and public verification agree visually.
+- `PublicVerificationResult` states plainly when the response carries no confirmed transaction hash and block number, and says that blockchain anchors integrity rather than being the system of record.
+- `PublicVerificationPage` gained a page heading, a visible four-step workflow, per-field validation, `aria-busy` on submit, and moves focus to the result region when a result arrives. It remains unauthenticated.
+
+**Loading, empty and error states**
+
+- `LoadingState`, `EmptyState` and `ErrorState` were standardised (shared surface, sizes, tone, optional empty-state action). Empty states say the service returned no records; they never imply a record is absent from the system. No raw JSON or server detail is rendered.
+
+**404**
+
+- `NotFoundPage` replaces the previous silent `path="*"` → `/dashboard` redirect, for both the public and authenticated route trees. An unknown address is now reported as such.
+
+### Business semantics preserved
+
+- The four verification states, their names, and their factual meanings are unchanged.
+- No API contract, backend file, database model, authorization rule or blockchain semantic was modified.
+- No trust, reputation, risk, reliability or ranking score, and no "trusted/safe contractor" claim was introduced.
+- No fixture, hash, transaction, block number or explorer URL was invented. Proof is shown only when the response confirms it.
+- No test was rewritten to make a change pass.
+
+### Validation
+
+- `cd frontend && npm run lint` — passed.
+- `cd frontend && npm test -- --run` — 31 files passed, 242 tests passed.
+- `cd frontend && npm run build` — passed, including TypeScript compilation.
+- `cd backend && npm test` — 37 files passed, 254 tests passed (unchanged by this task; no backend file was edited).
+- `cd contracts && npx hardhat test` — 6 passing.
+- Browser: pages were rendered in headless Chrome from a Vite dev server and the resulting DOM was inspected. Verified for `/login`, `/verify` and an unknown route: correct single `h1` per page, labelled form controls, the 404 screen renders instead of redirecting, and no horizontal overflow at 360, 390, 768 or 1280 CSS pixels.
+- NOT PERFORMED: live browser *visual* inspection. Screenshots were captured but this environment cannot perceive images, so no claim is made about visual appearance, spacing or contrast as rendered. Authenticated screens were exercised by the automated suite (jsdom), not in a browser, because the local backend was not started.
+
+### Known limitations
+
+- Authenticated pages were not opened in a real browser; the API, database and seed data were not started or created.
+- The evidence DTO exposes only `currentVersion`, so the evidence screen cannot show a version history. The passport projection is the only place historical versions appear.
+- Timestamps are formatted for display but the passport and variation records still render some raw backend timestamps; those pages were outside this task's staging scope.

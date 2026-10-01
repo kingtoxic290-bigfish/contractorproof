@@ -1,6 +1,12 @@
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { RoleAwareNav } from "../navigation/RoleAwareNav";
 
+/**
+ * Mobile navigation drawer. Mirrors the desktop sidebar and closes on Escape or
+ * on selection. It is rendered only while open, so it adds no layout on small
+ * screens.
+ */
 export function MobileNav({
   open,
   onClose,
@@ -35,12 +41,25 @@ export function MobileNav({
       />
       <div
         id="mobile-navigation"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Application navigation"
         className="fixed inset-y-0 left-0 z-40 w-80 max-w-[88vw] overflow-y-auto bg-stone-50 p-4 shadow-xl"
       >
-        <p className="font-serif text-xl text-stone-900">ContractorProof</p>
-        <p className="mt-1 mb-4 text-sm text-stone-600">
-          Verifiable Contractor Performance. Trusted Project Evidence.
-        </p>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-serif text-lg leading-tight text-stone-900">ContractorProof</p>
+            <p className="mt-1 text-xs text-stone-600">Verification workspace</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close navigation menu"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
         <RoleAwareNav id="mobile-nav-links" onNavigate={onClose} />
       </div>
     </div>

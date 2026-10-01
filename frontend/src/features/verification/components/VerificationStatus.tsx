@@ -1,24 +1,25 @@
+import { verificationTone } from "../../../components/ui/statusTone";
 import { cn } from "../../../utils/cn";
-import { isVerificationStatus } from "../types";
 
-const STATUS_CLASS: Record<string, string> = {
-  MATCH: "border-teal-700 bg-teal-50 text-teal-950",
-  MISMATCH: "border-amber-600 bg-amber-50 text-amber-950",
-  PENDING: "border-stone-400 bg-stone-50 text-stone-800",
-  UNAVAILABLE: "border-slate-500 bg-slate-50 text-slate-900",
-};
-
+/**
+ * Renders one of the four backend verification states.
+ *
+ * The state name is always visible as text and paired with an icon, so it is
+ * never communicated by colour alone. The wording is the backend's state and is
+ * never renamed.
+ */
 export function VerificationStatus({ status }: { status: string }) {
-  const tone = isVerificationStatus(status) ? STATUS_CLASS[status] : "border-stone-300 bg-white text-stone-800";
+  const { tone, icon: Icon, meaning } = verificationTone(status);
 
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-medium",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
         tone,
       )}
+      title={meaning}
     >
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+      <Icon aria-hidden="true" className="h-3.5 w-3.5" />
       <span>{status}</span>
     </span>
   );

@@ -1,6 +1,14 @@
+import { Construction } from "lucide-react";
 import { EmptyState } from "../components/feedback/EmptyState";
 import { PageHeader } from "../components/ui/PageHeader";
 
+/**
+ * Screen for a module the service does not expose yet.
+ *
+ * It states plainly that no records are shown and that the service does not
+ * currently return data for this area. It never implies that an empty list means
+ * a record is absent from the system.
+ */
 export function PlaceholderPage({
   title,
   description,
@@ -10,10 +18,10 @@ export function PlaceholderPage({
 }) {
   return (
     <section>
-      <PageHeader title={title} description={description} />
+      <PageHeader title={title} description={description} icon={Construction} />
       <EmptyState
-        title="This module is under development."
-        description="No records are shown here yet. This screen will use backend data when the module is implemented."
+        title="This module is not available yet."
+        description="The service does not currently return records for this area, so nothing is shown here. No records have been created, removed or assessed."
       />
     </section>
   );

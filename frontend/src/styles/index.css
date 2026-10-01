@@ -33,8 +33,10 @@ body {
   min-height: 100vh;
   background: var(--cp-bg);
   color: var(--cp-text);
-  font-family: "Segoe UI", "Source Sans 3", sans-serif;
+  font-family: "Segoe UI", "Source Sans 3", system-ui, -apple-system, sans-serif;
   text-rendering: optimizeLegibility;
+  /* Long identifiers and hashes must wrap rather than widen the page. */
+  overflow-wrap: break-word;
 }
 
 #root {
@@ -46,8 +48,17 @@ h2,
 h3,
 h4,
 .font-serif {
-  font-family: "Georgia", "Times New Roman", serif;
+  font-family: Georgia, "Times New Roman", serif;
   letter-spacing: -0.02em;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Consolas, "Liberation Mono",
+    monospace;
+  /* SHA-256 values are 64 characters and must never overflow their container. */
+  overflow-wrap: anywhere;
 }
 
 p,
@@ -67,13 +78,21 @@ th {
   background: rgba(15, 61, 58, 0.15);
 }
 
+/* A single, consistently visible focus treatment across the product. */
 :focus-visible {
   outline: 2px solid var(--cp-primary);
   outline-offset: 2px;
 }
 
+/* Tables scroll inside their own container on narrow screens. */
+table {
+  border-collapse: collapse;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

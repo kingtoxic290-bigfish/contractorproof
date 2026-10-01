@@ -1,22 +1,39 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
+import { FileCheck2, History, ShieldCheck } from "lucide-react";
 import { Card } from "../../../components/ui/Card";
-import { Button } from "../../../components/ui/Button";
-import type { PublicEvidence } from "../types";
+import { CopyButton } from "../../../components/ui/CopyButton";
+import { Field, FieldGrid, HashValue } from "../../../components/ui/Field";
+import { formatDateTime } from "../../../utils/format";
 import { formatFileSize } from "../validation";
+import type { PublicEvidence } from "../types";
 import { EvidenceStatus } from "./EvidenceStatus";
 
-export function EvidenceCard({ record }: { record: PublicEvidence }) {
-  const [copyMessage, setCopyMessage] = useState("");
+/**
+ * Presents one evidence record as an auditable record.
+ *
+ * Every value shown here is returned by the API. The card presents the evidence
+ * identity, its SHA-256 fingerprint, the current version, the verification and
+ * workflow states, and the milestone it belongs to. It deliberately shows no
+ * storage path and no internal file-system detail, and it does not describe a
+ * record as immutable merely because a hash exists.
+ */
+export function EvidenceCard({
+  record,
+  projectId,
+}: {
+  record: PublicEvidence;
+  projectId?: string;
+}) {
   const version = record.currentVersion;
-
-  async function copySha256() {
-    try {
-      await navigator.clipboard.writeText(record.sha256);
-      setCopyMessage("SHA-256 copied.");
-    } catch {
-      setCopyMessage("Clipboard access is unavailable; select the full hash to copy it.");
-    }
+  const created = formatDateTime(record.createdAt);
+  const updated = formatDateTime(record.updatedAt);
+  const versionCreated = version ? formatDateTime(version.createdAt) : null;
+  const reviewParams = new URLSearchParams({ evidenceId: record.id, milestoneId: record.milestoneId });
+  if (projectId) {
+    reviewParams.set("projectId", projectId);
+  }
+  if (record.currentVersionId) {
+    reviewParams.set("evidenceVersionId", record.currentVersionId);
   }
 
   return (
@@ -24,85 +41,103 @@ export function EvidenceCard({ record }: { record: PublicEvidence }) {
       <div className="space-y-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h3 className="break-words text-base font-medium text-stone-900">{record.fileName}</h3>
-            <p className="mt-1 text-sm text-stone-600">
-              {record.mimeType} · {formatFileSize(record.sizeBytes)}
-            </p>
+            <h3 className="break-words text-base font-semibold text-stone-900">{record.fileName}</h3>
+            <p className="mt-1 text-sm text-stone-600">Evidence record</p>
           </div>
           <EvidenceStatus status={record.status} verificationStatus={record.verificationStatus} />
         </div>
 
-        <dl className="grid gap-3 sm:grid-cols-2">
-          <div className="min-w-0">
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Evidence ID</dt>
-            <dd className="mt-1 break-all font-mono text-xs text-stone-900">{record.id}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Milestone ID</dt>
-            <dd className="mt-1 break-all font-mono text-xs text-stone-900">{record.milestoneId}</dd>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Canonical SHA-256</dt>
-            <dd className="mt-1 flex min-w-0 flex-wrap items-start gap-2">
-              <code className="min-w-0 flex-1 break-all font-mono text-xs text-stone-900">{record.sha256}</code>
-              <Button type="button" variant="secondary" onClick={() => void copySha256()}>
-                Copy SHA-256
-              </Button>
-            </dd>
-            <p className="mt-1 text-xs text-stone-600" role="status" aria-live="polite">
-              {copyMessage}
-            </p>
-          </div>
-          <div className="min-w-0">
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Created</dt>
-            <dd className="mt-1 break-words text-sm text-stone-900">{record.createdAt}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">Content type</dt>
-            <dd className="mt-1 break-words text-sm text-stone-900">{record.mimeType}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-stone-500">File size</dt>
-            <dd className="mt-1 text-sm text-stone-900">{formatFileSize(record.sizeBytes)}</dd>
-          </div>
-        </dl>
+        <FieldGrid>
+          <Field label="Evidence ID" mono>
+            {record.id}
+          </Field>
+          <Field label="Milestone ID" mono>
+            {record.milestoneId}
+          </Field>
+          <Field label="Content type" className="sm:col-span-2">
+            {record.mimeType} · {formatFileSize(record.sizeBytes)}
+          </Field>
+          <Field label="Recorded">{created ?? "Not recorded"}</Field>
+          <Field label="Last updated">{updated ?? "Not recorded"}</Field>
+        </FieldGrid>
 
-        {version ? (
-          <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-3">
-            <h4 className="text-sm font-medium text-stone-900">Version {version.versionNumber}</h4>
-            <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-stone-500">Version ID</dt>
-                <dd className="mt-1 break-all font-mono text-xs text-stone-800">{version.id}</dd>
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-stone-500">
+                SHA-256 fingerprint
+              </p>
+              <div className="mt-1">
+                <HashValue value={record.sha256} />
               </div>
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-stone-500">Version created</dt>
-                <dd className="mt-1 break-words text-sm text-stone-800">{version.createdAt}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-stone-500">Version file</dt>
-                <dd className="mt-1 break-words text-sm text-stone-800">{version.fileName}</dd>
-              </div>
-              <div className="min-w-0">
-                <dt className="text-xs uppercase tracking-wide text-stone-500">Version file details</dt>
-                <dd className="mt-1 break-words text-sm text-stone-800">
+            </div>
+            <CopyButton value={record.sha256} label="Copy SHA-256" className="shrink-0" />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-stone-600">
+            A SHA-256 fingerprint identifies file content. It shows whether bytes are identical; it
+            does not establish that a claim in the document is accurate.
+          </p>
+        </div>
+
+        <section aria-labelledby={`evidence-version-${record.id}`}>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <h4
+              id={`evidence-version-${record.id}`}
+              className="text-sm font-semibold text-stone-900"
+            >
+              {version ? `Version ${version.versionNumber}` : "Version"}
+            </h4>
+            {version ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#166534] bg-[#dcfce7] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.06em] text-[#166534]">
+                Current version
+              </span>
+            ) : null}
+          </div>
+          {version ? (
+            <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+              <FieldGrid>
+                <Field label="Version ID" mono>
+                  {version.id}
+                </Field>
+                <Field label="Version created">{versionCreated ?? "Not recorded"}</Field>
+                <Field label="Version file" className="sm:col-span-2">
+                  {version.fileName}
+                </Field>
+                <Field label="Version file details" className="sm:col-span-2">
                   {version.mimeType} · {formatFileSize(version.sizeBytes)}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        ) : (
-          <p className="text-sm text-stone-600">No current-version metadata was supplied.</p>
-        )}
+                </Field>
+              </FieldGrid>
+            </div>
+          ) : (
+            <p className="text-sm text-stone-600">
+              No current version metadata was returned for this evidence record.
+            </p>
+          )}
+        </section>
 
-        <div className="flex flex-wrap gap-3">
+        <nav aria-label="Evidence record links" className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+          <Link
+            to={`/milestones/${encodeURIComponent(record.milestoneId)}`}
+            className="inline-flex items-center gap-1.5 font-semibold text-[#0f3d3a] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]"
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+            Milestone this evidence belongs to
+          </Link>
+          <Link
+            to={`/verification?${reviewParams.toString()}`}
+            className="inline-flex items-center gap-1.5 font-semibold text-[#0f3d3a] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]"
+          >
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+            Review verification for this evidence
+          </Link>
           <Link
             to={`/evidence?milestoneId=${encodeURIComponent(record.milestoneId)}`}
-            className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+            className="inline-flex items-center gap-1.5 font-semibold text-[#0f3d3a] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]"
           >
-            Milestone {record.milestoneId}
+            <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+            All evidence for this milestone
           </Link>
-        </div>
+        </nav>
       </div>
     </Card>
   );

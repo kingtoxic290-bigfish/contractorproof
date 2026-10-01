@@ -1,6 +1,12 @@
 import { AlertTriangle } from "lucide-react";
 import { Button } from "../ui/Button";
 
+/**
+ * Standard error state.
+ *
+ * `role="alert"` announces the failure. Only a factual, user-facing message is
+ * shown: no stack traces, raw payloads or internal server detail.
+ */
 export function ErrorState({
   message = "We couldn't load this information. Please try again.",
   onRetry,
@@ -9,20 +15,29 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-6 shadow-[0_1px_2px_rgba(153,27,27,0.06)]">
+    <div
+      role="alert"
+      className="rounded-xl border border-red-200 bg-red-50 px-4 py-5"
+    >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full bg-red-100 text-red-700">
+        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
           <AlertTriangle className="h-4 w-4" aria-hidden="true" />
         </div>
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-red-950">{message}</p>
+          {onRetry ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              onClick={onRetry}
+            >
+              Try again
+            </Button>
+          ) : null}
         </div>
       </div>
-      {onRetry ? (
-        <Button type="button" variant="secondary" className="mt-3" onClick={onRetry}>
-          Try again
-        </Button>
-      ) : null}
     </div>
   );
 }
