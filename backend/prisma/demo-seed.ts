@@ -166,6 +166,13 @@ async function removePreviousDemoData(): Promise<void> {
 async function main(): Promise<void> {
   await removePreviousDemoData();
 
+  // The demo dataset is for browser walkthroughs only. Backend tests assert on
+  // global record counts, so it must be removed before running the suite.
+  if (process.argv.includes("--clean")) {
+    console.log("Demo dataset removed.");
+    return;
+  }
+
   await provisionPrivileged(ACCOUNTS.admin);
   const client = await registerAccount(ACCOUNTS.client);
   const contractor = await registerAccount(ACCOUNTS.contractor);

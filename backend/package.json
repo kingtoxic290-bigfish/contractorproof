@@ -12,7 +12,9 @@
     "prisma:validate": "prisma validate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
-    "provision:privileged": "tsx prisma/seed.ts"
+    "provision:privileged": "tsx prisma/seed.ts",
+    "demo:seed": "tsx prisma/demo-seed.ts",
+    "demo:clean": "tsx prisma/demo-seed.ts --clean"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
