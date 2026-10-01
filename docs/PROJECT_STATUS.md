@@ -773,3 +773,104 @@ KNOWN LIMITATIONS:
   the passport projection.
 * Some passport and variation records still render raw backend timestamps; those files were
   outside this task's commit scope because they already contained unrelated uncommitted work.
+
+---
+
+## PHASE 2 — END-TO-END PRODUCT LIFECYCLE & ACCEPTANCE VALIDATION
+
+STATUS: PASS WITH ONE KNOWN GAP (documented below)
+
+SCOPE:
+
+* Validation only. No production behaviour, API contract, database model, authorization rule,
+  verification semantic or blockchain semantic was changed. No CRB/NIDA/NeST work was introduced.
+  The only production-tree edits in this phase were to test infrastructure and documentation.
+
+ACCEPTANCE SCENARIO ADDED:
+
+* `backend/test/qa/e2e.lifecycle.acceptance.test.ts` runs the complete lifecycle over HTTP against a
+  real local Hardhat chain. It uses the published Hardhat dev account #0 through the existing
+  `setProofBlockchainWriterFactory` seam pointed at a genuine `BlockchainService` — the proof writer
+  is NOT mocked.
+* Scenario: CLIENT creates "Morogoro Municipal Office Renovation", creates three milestones
+  (Site Preparation, Foundation Works, Structural Works), assigns CONTRACTOR A. CONTRACTOR B was the
+  originally-bound contractor and is reassigned away, so B's continued denial is a real IDOR
+  assertion rather than a stranger check.
+* Evidence payloads are fixed byte strings, so every SHA-256 in the scenario is deterministic.
+* 11 sequential steps: project/milestone creation and authorization, assignment, contractor scoping,
+  IDOR denial, evidence submission and hashing, technical verification (MATCH and MISMATCH),
+  client human review (correction + dispute), authorized attestation and role denial, live
+  blockchain confirmation, passport history, public verification, tampering detection, and a role
+  matrix.
+
+TEST INFRASTRUCTURE CHANGE:
+
+* `backend/test/qa/hardhat.ts` — `ensureLocalHardhat`, `stopQaHardhat`,
+  `deployContractorProofRegistry` and the reachability probe are now port-parameterised (defaulting
+  to the previous 8545 behaviour). This lets the acceptance file own a dedicated node on 8546.
+  Without it the new file would have raced nonces against `e2e.blockchain.live.test.ts`, since every
+  live transaction is sent from Hardhat account #0 and Vitest runs files in parallel.
+
+LIFECYCLE RESULTS: all 11 steps PASS, including against the live chain.
+
+VERIFIED, WITH EVIDENCE:
+
+* Evidence files are stored on the local filesystem behind an opaque storage key; only the 64-char
+  SHA-256 digest is ever anchored. The scenario asserts that no file byte string appears in any
+  blockchain event row.
+* Technical verification is system-computed only. CLIENT, CONTRACTOR A and CONTRACTOR B are all
+  refused (403) at POST /api/v1/verification, and a forged `status` field cannot change a result.
+  Verification rows are append-only: MATCH and MISMATCH both persist for the same evidence version.
+* Human review (correction/dispute) records are created by the client but never mutate the
+  cryptographic verification history; the original version, hash and verification rows are preserved.
+* CONTRACTOR is refused attestation (403), unauthenticated is refused (401), and an attestation does
+  not alter the technical result.
+* Live chain proof is confirmed with a real txHash and blockNumber > 0 for both VERIFICATION and
+  ATTESTATION events, associated to the correct project.
+* Passport exposes versions, both verification results, attestations, corrections and proofs, and
+  contains no score of any kind.
+* Public verification is unauthenticated, returns MATCH only against a confirmed on-chain anchor,
+  returns MISMATCH for a tampered payload, UNAVAILABLE for an unknown reference, and leaks no
+  internal fields.
+* A forged 403 does not invalidate the session: the denied contractor remains authenticated
+  afterwards.
+
+KNOWN GAP (the one incomplete item in the target lifecycle):
+
+* Human review is fully implemented and exercised on the server, but it is NOT reachable through the
+  user interface. The frontend routes `/disputes` and `/corrections` still render `PlaceholderPage`,
+  so a client who selects "Request correction" or "Raise dispute" lands on a page stating the module
+  is not available. The nav items are also advertised to CLIENT/CONTRACTOR. This is a UI gap, not an
+  authorization or data gap; closing it is new feature work and was deliberately not started here.
+
+DISCREPANCY FOUND IN PHASE 1 REPORTING (code is the source of truth):
+
+* Phase 1 reported "ATTEST is restricted to ADMIN / CONSULTANT_ENGINEER / PROCUREMENT_OFFICER".
+  The code actually allows `ATTEST_ROLES = CONSULTANT_ENGINEER, CLIENT, PROCUREMENT_OFFICER, AUDITOR,
+  ADMIN`, further narrowed per-milestone by a verification policy's `allowedRoles`. CONTRACTOR is
+  definitively excluded and a user can never attest evidence they uploaded or evidence they own as
+  contractor. The existing `attestation-authz.test.ts` asserts AUDITOR attestation is allowed, so the
+  implemented contract is intentional. No change was made.
+
+TESTS:
+
+* Backend: 38 files, 265 tests passed (254 pre-existing + 11 new acceptance steps).
+* Backend typecheck: clean. Frontend lint: clean. Frontend: 31 files / 242 tests passed, build passed.
+* Contracts: 6 Hardhat tests passing.
+* Flakiness: eight full backend runs were executed. Six passed cleanly. Two showed transient,
+  timeout-shaped failures in unrelated files (once 12 failures, once a single golden-lifecycle
+  failure) caused by shared-PostgreSQL contention under parallel test execution. No assertion was
+  weakened and no production behaviour was altered to accommodate them.
+
+FILES CHANGED IN THIS PHASE:
+
+* backend/test/qa/e2e.lifecycle.acceptance.test.ts (new)
+* backend/test/qa/hardhat.ts (port-parameterised test helper)
+* docs/PROJECT_STATUS.md (this section)
+
+PHASE 3 READINESS:
+
+* The backend lifecycle, authorization, IDOR protection, immutability and public verification are
+  proven by executable integration tests, so Phase 3 (CRB integration) is safe to begin from a
+  backend standpoint. Resolve the `/disputes` and `/corrections` UI placeholder first if the Phase 3
+  demonstration is expected to include human review through the browser.

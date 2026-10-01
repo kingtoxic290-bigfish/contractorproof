@@ -19,11 +19,11 @@ const ARTIFACT_PATH = path.resolve(
 );
 const CONTRACTS_ROOT = path.resolve(__dirname, "../../../contracts");
 
-let startedByQa: ChildProcess | undefined;
+const startedByQa: ChildProcess[] = [];
 
-async function rpcChainId(): Promise<number | null> {
+async function rpcChainId(rpcUrl: string = HARDHAT_RPC_URL): Promise<number | null> {
   try {
-    const response = await fetch(HARDHAT_RPC_URL, {
+    const response = await fetch(rpcUrl, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -44,8 +44,8 @@ async function rpcChainId(): Promise<number | null> {
   }
 }
 
-export async function isLocalHardhatAvailable(): Promise<boolean> {
-  const chainId = await rpcChainId();
+export async function isLocalHardhatAvailable(rpcUrl: string = HARDHAT_RPC_URL): Promise<boolean> {
+  const chainId = await rpcChainId(rpcUrl);
   return chainId === HARDHAT_CHAIN_ID;
 }
 
@@ -54,26 +54,21 @@ export async function isLocalHardhatAvailable(): Promise<boolean> {
  * Starts `npx hardhat node` when nothing answers; if the port is already
  * occupied by Hardhat, reuses it. Does not require a manual RPC start.
  */
-export async function ensureLocalHardhat(): Promise<boolean> {
-  if (await isLocalHardhatAvailable()) {
+export async function ensureLocalHardhat(
+  rpcUrl: string = HARDHAT_RPC_URL,
+  port: number = 8545,
+): Promise<boolean> {
+  if (await isLocalHardhatAvailable(rpcUrl)) {
     return true;
   }
 
-  if (startedByQa) {
-    for (let i = 0; i < 25; i += 1) {
-      if (await isLocalHardhatAvailable()) {
-        return true;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 200));
-    }
-  }
-
-  startedByQa = spawn("npx", ["hardhat", "node"], {
+  const child = spawn("npx", ["hardhat", "node", "--port", String(port)], {
     cwd: CONTRACTS_ROOT,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env },
     detached: true,
   });
+  startedByQa.push(child);
 
   let sawAddrInUse = false;
   const ready = await new Promise<boolean>((resolve) => {
@@ -88,9 +83,9 @@ export async function ensureLocalHardhat(): Promise<boolean> {
         sawAddrInUse = true;
       }
     };
-    startedByQa?.stdout?.on("data", onData);
-    startedByQa?.stderr?.on("data", onData);
-    startedByQa?.on("exit", () => {
+    child.stdout?.on("data", onData);
+    child.stderr?.on("data", onData);
+    child.on("exit", () => {
       clearTimeout(timer);
       // Port may already host a healthy Hardhat we did not start.
       resolve(false);
@@ -98,51 +93,50 @@ export async function ensureLocalHardhat(): Promise<boolean> {
   });
 
   if (!ready) {
-    const child = startedByQa;
-    startedByQa = undefined;
-    child?.kill("SIGTERM");
-    if (sawAddrInUse || (await isLocalHardhatAvailable())) {
-      return isLocalHardhatAvailable();
+    const index = startedByQa.indexOf(child);
+    if (index >= 0) startedByQa.splice(index, 1);
+    child.kill("SIGTERM");
+    if (sawAddrInUse) {
+      return isLocalHardhatAvailable(rpcUrl);
     }
     return false;
   }
 
   for (let i = 0; i < 25; i += 1) {
-    if (await isLocalHardhatAvailable()) {
+    if (await isLocalHardhatAvailable(rpcUrl)) {
       return true;
     }
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  stopQaHardhat();
+  child.kill("SIGKILL");
+  const index = startedByQa.indexOf(child);
+  if (index >= 0) startedByQa.splice(index, 1);
   return false;
 }
 
 export function stopQaHardhat(): void {
-  if (!startedByQa) {
-    return;
-  }
-  const child = startedByQa;
-  startedByQa = undefined;
-  try {
-    if (child.pid) {
-      // Kill the whole process group when possible (npx → hardhat node).
-      process.kill(-child.pid, "SIGKILL");
-    }
-  } catch {
+  for (const child of startedByQa.splice(0)) {
     try {
-      child.kill("SIGKILL");
+      if (child.pid) {
+        // Kill the whole process group when possible (npx → hardhat node).
+        process.kill(-child.pid, "SIGKILL");
+      }
     } catch {
-      // already exited
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // already exited
+      }
     }
   }
 }
 
-export async function deployContractorProofRegistry() {
+export async function deployContractorProofRegistry(rpcUrl: string = HARDHAT_RPC_URL) {
   const artifact = JSON.parse(readFileSync(ARTIFACT_PATH, "utf8")) as {
     abi: unknown[];
     bytecode: string;
   };
-  const provider = new JsonRpcProvider(HARDHAT_RPC_URL);
+  const provider = new JsonRpcProvider(rpcUrl);
   const network = await provider.getNetwork();
   if (Number(network.chainId) !== HARDHAT_CHAIN_ID) {
     throw new Error(`expected Hardhat chain ${HARDHAT_CHAIN_ID}, got ${network.chainId}`);
