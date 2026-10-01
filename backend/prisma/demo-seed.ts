@@ -26,6 +26,11 @@ const ACCOUNTS = {
   client: { email: "demo.client@contractorproof.test", fullName: "Demo Client", role: "CLIENT" },
   contractor: { email: "demo.contractor@contractorproof.test", fullName: "Demo Contractor", role: "CONTRACTOR" },
   auditor: { email: "demo.auditor@contractorproof.test", fullName: "Demo Auditor", role: "AUDITOR" },
+  procurementOfficer: {
+    email: "demo.procurement@contractorproof.test",
+    fullName: "Demo Procurement Officer",
+    role: "PROCUREMENT_OFFICER",
+  },
 } as const;
 
 const PASSWORD = "demopassword123";
@@ -178,6 +183,7 @@ async function main(): Promise<void> {
   const contractor = await registerAccount(ACCOUNTS.contractor);
   const auditor = await provisionPrivileged(ACCOUNTS.auditor);
 
+
   // CLIENT creates the project and assigns the contractor in one request.
   const contractors = payloadOf(await api("get", "/contractors", client.token));
   const contractorRecords = (contractors.contractors ?? []) as { id: string }[];
@@ -283,6 +289,18 @@ async function main(): Promise<void> {
     milestoneId: createdMilestones[1].id,
     reason: "DEMO dispute: the recorded date conflicts with the site diary.",
   });
+
+  // PROCUREMENT_OFFICER syncs a NeST sandbox procurement record and links it to
+  // the contractor. The record is stored with its SANDBOX_DEMO source so the
+  // passport can never present it as live NeST data.
+  const officer = await provisionPrivileged(ACCOUNTS.procurementOfficer);
+  const procurement = payloadOf(
+    await api("post", "/procurement/sync", officer.token, { ocid: "ocds-sandbox-001" }),
+  );
+  const procurementRecord = procurement.record as { id: string } | undefined;
+  if (procurementRecord?.id) {
+    await api("post", `/contractors/${contractorId}/procurement/${procurementRecord.id}/link`, officer.token);
+  }
 
   const summary = {
     demoAccounts: Object.values(ACCOUNTS).map((account) => ({
