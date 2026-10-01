@@ -37,7 +37,10 @@ export function projectRecord(
   overrides: Partial<PublicProject> & Pick<PublicProject, "id" | "name">,
 ): PublicProject {
   return {
+    clientId: null,
+    clientName: null,
     contractorId: "contractor-1",
+    contractorName: "Demo Contractor Ltd",
     description: null,
     nestTenderReference: null,
     nestContractReference: null,

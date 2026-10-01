@@ -118,6 +118,42 @@ export type PassportVariation = {
   }>;
 };
 
+export type PassportProcurementObservation = {
+  id: string;
+  ocid: string;
+  releaseId: string;
+  releaseDate: string | null;
+  tenderReference: string | null;
+  title: string | null;
+  description: string | null;
+  buyerName: string | null;
+  buyerIdentifier: string | null;
+  procurementCategory: string | null;
+  tenderStatus: string | null;
+  awardStatus: string | null;
+  awardDate: string | null;
+  contractReference: string | null;
+  contractStatus: string | null;
+  contractorName: string | null;
+  contractorIdentifier: string | null;
+  contractValue: string | null;
+  contractCurrency: string | null;
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+  normalizedData: JsonValue;
+  sourceDigest: string;
+  retrievedAt: string;
+};
+
+export type PassportProcurementRecord = {
+  sourceSystem: "SANDBOX_DEMO" | "NEST_OCDS_PUBLIC";
+  externalReference: string;
+  sourceRecordId: string | null;
+  sourceReference: string;
+  linkedAt: string;
+  observations: PassportProcurementObservation[];
+};
+
 export type ProjectPassport = {
   contractor: {
     id: string;
@@ -129,6 +165,7 @@ export type ProjectPassport = {
     crbStatus: string | null;
     crbLastVerifiedAt: string | null;
     crbSource: string | null;
+    procurementRecords: PassportProcurementRecord[];
   };
   project: {
     id: string;
@@ -414,6 +451,53 @@ function parseVariation(value: unknown): PassportVariation | null {
   return { id, variationReference, reason, status, createdAt, review, originalState, proposedState, milestone, evidence, previousProof, variationProof, resolutions };
 }
 
+function parseProcurementObservation(value: unknown): PassportProcurementObservation | null {
+  if (!isPlainRecord(value)) return null;
+  const id = requiredString(value.id);
+  const ocid = requiredString(value.ocid);
+  const releaseId = requiredString(value.releaseId);
+  const sourceDigest = requiredString(value.sourceDigest);
+  const retrievedAt = timestamp(value.retrievedAt);
+  const releaseDate = nullableTimestamp(value.releaseDate);
+  const awardDate = nullableTimestamp(value.awardDate);
+  const contractStartDate = nullableTimestamp(value.contractStartDate);
+  const contractEndDate = nullableTimestamp(value.contractEndDate);
+  const contractValue = nullableString(value.contractValue);
+  const normalizedData = parseJson(value.normalizedData);
+  const nullableFields = [
+    "tenderReference", "title", "description", "buyerName", "buyerIdentifier",
+    "procurementCategory", "tenderStatus", "awardStatus", "contractReference",
+    "contractStatus", "contractorName", "contractorIdentifier", "contractCurrency",
+  ] as const;
+  const fields = Object.fromEntries(nullableFields.map((key) => [key, nullableString(value[key])])) as Record<(typeof nullableFields)[number], string | null | undefined>;
+  if (
+    !id || !ocid || !releaseId || !sourceDigest || !retrievedAt ||
+    releaseDate === undefined || awardDate === undefined || contractStartDate === undefined ||
+    contractEndDate === undefined || contractValue === undefined || normalizedData === null ||
+    Object.values(fields).some((field) => field === undefined)
+  ) return null;
+  return {
+    id, ocid, releaseId, sourceDigest, retrievedAt, releaseDate, awardDate,
+    contractStartDate, contractEndDate, contractValue, normalizedData,
+    ...fields as Record<(typeof nullableFields)[number], string | null>,
+  };
+}
+
+function parseProcurementRecord(value: unknown): PassportProcurementRecord | null {
+  if (!isPlainRecord(value)) return null;
+  const sourceSystem = value.sourceSystem;
+  const externalReference = requiredString(value.externalReference);
+  const sourceRecordId = nullableString(value.sourceRecordId);
+  const sourceReference = requiredString(value.sourceReference);
+  const linkedAt = timestamp(value.linkedAt);
+  const observations = parseArray(value.observations, parseProcurementObservation);
+  if (
+    (sourceSystem !== "SANDBOX_DEMO" && sourceSystem !== "NEST_OCDS_PUBLIC") ||
+    !externalReference || sourceRecordId === undefined || !sourceReference || !linkedAt || !observations
+  ) return null;
+  return { sourceSystem, externalReference, sourceRecordId, sourceReference, linkedAt, observations };
+}
+
 function parseContractor(value: unknown): ProjectPassport["contractor"] | null {
   if (!isPlainRecord(value)) return null;
   const id = requiredString(value.id);
@@ -425,8 +509,9 @@ function parseContractor(value: unknown): ProjectPassport["contractor"] | null {
   const crbStatus = nullableString(value.crbStatus);
   const crbLastVerifiedAt = nullableTimestamp(value.crbLastVerifiedAt);
   const crbSource = nullableString(value.crbSource);
-  if (!id || !legalName || crbRegistrationNumber === undefined || crbCategory === undefined || crbType === undefined || crbClass === undefined || crbStatus === undefined || crbLastVerifiedAt === undefined || crbSource === undefined) return null;
-  return { id, legalName, crbRegistrationNumber, crbCategory, crbType, crbClass, crbStatus, crbLastVerifiedAt, crbSource };
+  const procurementRecords = parseArray(value.procurementRecords, parseProcurementRecord);
+  if (!id || !legalName || crbRegistrationNumber === undefined || crbCategory === undefined || crbType === undefined || crbClass === undefined || crbStatus === undefined || crbLastVerifiedAt === undefined || crbSource === undefined || !procurementRecords) return null;
+  return { id, legalName, crbRegistrationNumber, crbCategory, crbType, crbClass, crbStatus, crbLastVerifiedAt, crbSource, procurementRecords };
 }
 
 function parseProject(value: unknown): ProjectPassport["project"] | null {

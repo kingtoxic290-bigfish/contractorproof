@@ -66,11 +66,13 @@ export const authService = {
         },
       });
       if (role === Role.CONTRACTOR) {
+        // No CRB fields are asserted here. crbSource/crbStatus stay null until a
+        // real check runs against a CRB adapter, so registering an account can
+        // never be mistaken for a CRB registration result.
         await tx.contractor.create({
           data: {
             userId: created.id,
             legalName: fullName,
-            crbSource: "SYNTHETIC_DEMO",
           },
         });
       }

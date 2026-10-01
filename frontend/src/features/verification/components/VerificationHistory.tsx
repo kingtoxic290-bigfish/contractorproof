@@ -23,9 +23,9 @@ export function VerificationHistory({
       onRetry={history.retry}
       loadingMessage="Loading persisted verification history..."
       emptyTitle="No verification results yet."
-      emptyDescription="The authorized passport projection contains no verification records for this evidence context."
+      emptyDescription="No verification records were found for this evidence context."
     >
-      <Card title="Persisted verification history" description="Historical records are shown in the order returned by the backend and are not replaced by a later comparison.">
+      <Card title="Persisted verification history" description="Historical verification records, shown in chronological order. Earlier records are preserved and are not replaced by later comparisons.">
         <ol className="space-y-4">
           {history.records.map((entry) => {
             const proof = entry.proof;
@@ -66,7 +66,7 @@ export function VerificationHistory({
                     <dd className="mt-1 text-sm text-stone-900">{entry.verification.source}</dd>
                   </div>
                   <div className="min-w-0 sm:col-span-2">
-                    <dt className="text-xs uppercase tracking-wide text-stone-500">Backend SHA-256</dt>
+                    <dt className="text-xs uppercase tracking-wide text-stone-500">Recorded SHA-256</dt>
                     <dd className="mt-1 break-all font-mono text-xs text-stone-900">{entry.sha256}</dd>
                   </div>
                   <div>

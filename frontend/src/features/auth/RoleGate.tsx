@@ -6,7 +6,7 @@ export function RoleGate({
   allow,
   children,
 }: {
-  allow: Role[];
+  allow: readonly Role[];
   children: React.ReactNode;
 }) {
   const { status, user } = useAuth();

@@ -1,9 +1,9 @@
-import { Role, type Milestone, type Prisma, type Project } from "@prisma/client";
+import { Role, type Milestone, type Prisma } from "@prisma/client";
 import { ApiError } from "../http/errors";
 import { HttpError } from "../middleware/errorHandler";
 import { contractorRepository } from "../repositories/contractor.repository";
-import { projectRepository } from "../repositories/project.repository";
-import { assertCanWriteProject } from "./access.service";
+import { projectRepository, type ProjectWithRelations } from "../repositories/project.repository";
+import { assertCanManageProject, assertCanWriteProject } from "./access.service";
 import type { PublicMilestone, PublicProject, PublicUser } from "../types";
 
 const UUID_PATTERN =
@@ -42,10 +42,13 @@ function toIsoString(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
-function toPublicProject(row: Project): PublicProject {
+function toPublicProject(row: ProjectWithRelations): PublicProject {
   return {
     id: row.id,
+    clientId: row.clientId,
+    clientName: row.client?.fullName ?? null,
     contractorId: row.contractorId,
+    contractorName: row.contractor.legalName,
     name: row.name,
     description: row.description,
     nestTenderReference: row.nestTenderReference,
@@ -133,29 +136,21 @@ export const projectService = {
       throw new ApiError(400, "VALIDATION_ERROR", "name is required");
     }
 
-    let contractorId: string;
-    if (actor.role === Role.ADMIN) {
-      const supplied = optionalTrimmed(input.contractorId);
-      if (!supplied || !UUID_PATTERN.test(supplied)) {
-        throw new ApiError(400, "VALIDATION_ERROR", "contractorId must be a valid UUID");
-      }
-      const contractor = await contractorRepository.getContractorById(supplied);
-      if (!contractor) {
-        throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
-      }
-      contractorId = contractor.id;
-    } else if (actor.role === Role.CONTRACTOR) {
-      const contractor = await contractorRepository.getContractorByUserId(actor.id);
-      if (!contractor) {
-        throw new ApiError(403, "FORBIDDEN", "insufficient permission");
-      }
-      contractorId = contractor.id;
-    } else {
+    if (actor.role !== Role.CLIENT && actor.role !== Role.ADMIN) {
       throw new ApiError(403, "FORBIDDEN", "insufficient permission");
+    }
+    const suppliedContractorId = optionalTrimmed(input.contractorId);
+    if (!suppliedContractorId || !UUID_PATTERN.test(suppliedContractorId)) {
+      throw new ApiError(400, "VALIDATION_ERROR", "contractorId must be a valid UUID");
+    }
+    const contractor = await contractorRepository.getContractorById(suppliedContractorId);
+    if (!contractor) {
+      throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
     }
 
     const row = await projectRepository.createProject({
-      contractorId,
+      clientId: actor.role === Role.CLIENT ? actor.id : null,
+      contractorId: contractor.id,
       name,
       description: optionalTrimmed(input.description) ?? null,
       nestTenderReference: optionalTrimmed(input.nestTenderReference) ?? null,
@@ -187,7 +182,7 @@ export const projectService = {
       throw new ApiError(400, "VALIDATION_ERROR", "name is required");
     }
 
-    await assertCanWriteProject(actor, projectId);
+    await assertCanManageProject(actor, projectId);
 
     const policyId = optionalTrimmed(input.policyId);
     if (policyId) {
@@ -210,5 +205,24 @@ export const projectService = {
       policyId: policyId ?? null,
     });
     return toPublicMilestone(row);
+  },
+
+  async assignContractor(
+    actor: PublicUser,
+    projectId: string | undefined,
+    input: { contractorId?: unknown },
+  ): Promise<PublicProject> {
+    const id = requireProjectId(projectId);
+    await assertCanManageProject(actor, id);
+    const contractorId = optionalTrimmed(input.contractorId);
+    if (!contractorId || !UUID_PATTERN.test(contractorId)) {
+      throw new ApiError(400, "VALIDATION_ERROR", "contractorId must be a valid UUID");
+    }
+    const contractor = await contractorRepository.getContractorById(contractorId);
+    if (!contractor) {
+      throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
+    }
+    const updated = await projectRepository.updateProjectContractor(id, contractor.id);
+    return toPublicProject(updated);
   },
 };

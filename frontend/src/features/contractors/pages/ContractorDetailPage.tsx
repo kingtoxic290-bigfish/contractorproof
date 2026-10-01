@@ -13,7 +13,7 @@ export function ContractorDetailPage() {
     <section className="space-y-6">
       <PageHeader
         title="Contractor"
-        description="Only fields returned by the contractor API are shown. Associated projects will appear when that API is available."
+        description="Contractor identity and registration fields. Open the Passports section to review project evidence history associated with this contractor."
       />
       <p>
         <Link
@@ -35,16 +35,16 @@ export function ContractorDetailPage() {
           </Card>
         ) : null}
       </QueryPanel>
-      <Card title="Associated projects" description="Open project-scoped Passports for the project records accessible to this account.">
+      <Card title="Associated projects" description="Project evidence history for this contractor is available through the Passport section.">
         <p className="text-sm text-stone-600">
-          The Passport list is based on the backend-authorized project projection.
+          Passports show project milestones, evidence records, verification outcomes, and blockchain proof events authorized for your account.
         </p>
         <p className="mt-3">
           <Link
             to="/passports"
             className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
           >
-            View contractor Passports
+            View Contractor Passports
           </Link>
         </p>
       </Card>

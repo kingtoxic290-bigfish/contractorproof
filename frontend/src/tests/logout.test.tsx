@@ -36,7 +36,7 @@ describe("logout", () => {
     const user = userEvent.setup();
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: "Verification Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Operations Dashboard" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Log out" }));
 
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();

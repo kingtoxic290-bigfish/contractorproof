@@ -13,6 +13,16 @@ const passportInclude = {
       crbStatus: true,
       crbLastVerifiedAt: true,
       crbSource: true,
+      procurementLinks: {
+        orderBy: [{ linkedAt: "asc" }, { id: "asc" }],
+        include: {
+          procurementRecord: {
+            include: {
+              observations: { orderBy: [{ retrievedAt: "asc" }, { id: "asc" }] },
+            },
+          },
+        },
+      },
     },
   },
   milestones: {

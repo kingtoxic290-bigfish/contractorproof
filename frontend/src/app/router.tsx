@@ -4,6 +4,10 @@ import { PublicLayout } from "../components/layout/PublicLayout";
 import { GuestRoute } from "../features/auth/GuestRoute";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
 import { RoleGate } from "../features/auth/RoleGate";
+import { CorrectionsPage } from "../features/corrections/pages/CorrectionsPage";
+import { CORRECTION_PAGE_ROLES } from "../features/corrections/types";
+import { DisputesPage } from "../features/disputes/pages/DisputesPage";
+import { DISPUTE_PAGE_ROLES } from "../features/disputes/types";
 import { ContractorDetailPage } from "../features/contractors/pages/ContractorDetailPage";
 import { ContractorsPage } from "../features/contractors/pages/ContractorsPage";
 import { EvidencePage } from "../features/evidence/pages/EvidencePage";
@@ -13,7 +17,7 @@ import { MilestonesPage } from "../features/milestones/pages/MilestonesPage";
 import { PassportDetailPage } from "../features/passports/pages/PassportDetailPage";
 import { PassportsPage } from "../features/passports/pages/PassportsPage";
 import { VerificationPage } from "../features/verification/pages/VerificationPage";
-import { VERIFY_INTERNAL_ROLES } from "../features/verification/types";
+import { VERIFICATION_PAGE_ROLES } from "../features/verification/types";
 import { ProjectCreatePage } from "../features/projects/pages/ProjectCreatePage";
 import { ProjectDetailPage } from "../features/projects/pages/ProjectDetailPage";
 import { ProjectsPage } from "../features/projects/pages/ProjectsPage";
@@ -58,7 +62,7 @@ export function AppRouter() {
         <Route
           path="/projects/new"
           element={
-            <RoleGate allow={["CONTRACTOR", "ADMIN"]}>
+            <RoleGate allow={["CLIENT", "ADMIN"]}>
               <ProjectCreatePage />
             </RoleGate>
           }
@@ -67,7 +71,7 @@ export function AppRouter() {
         <Route
           path="/projects/:projectId/milestones/new"
           element={
-            <RoleGate allow={["CONTRACTOR", "ADMIN"]}>
+            <RoleGate allow={["CLIENT", "ADMIN"]}>
               <MilestoneCreatePage />
             </RoleGate>
           }
@@ -78,7 +82,7 @@ export function AppRouter() {
         <Route
           path="/verification"
           element={
-            <RoleGate allow={VERIFY_INTERNAL_ROLES}>
+            <RoleGate allow={VERIFICATION_PAGE_ROLES}>
               <VerificationPage />
             </RoleGate>
           }
@@ -88,19 +92,17 @@ export function AppRouter() {
         <Route
           path="/disputes"
           element={
-            <PlaceholderPage
-              title="Disputes"
-              description="Dispute records that preserve the original verification event will appear here."
-            />
+            <RoleGate allow={DISPUTE_PAGE_ROLES}>
+              <DisputesPage />
+            </RoleGate>
           }
         />
         <Route
           path="/corrections"
           element={
-            <PlaceholderPage
-              title="Corrections"
-              description="New correction events that leave the original event unchanged will appear here."
-            />
+            <RoleGate allow={CORRECTION_PAGE_ROLES}>
+              <CorrectionsPage />
+            </RoleGate>
           }
         />
         <Route

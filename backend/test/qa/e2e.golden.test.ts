@@ -9,6 +9,7 @@ import {
   cleanupQaUsers,
   independentSha256,
   privileged,
+  registerClient,
   seedProjectWithPolicy,
   trackUser,
   uploadEvidence,
@@ -89,10 +90,11 @@ describe("E2E-001 golden ContractorProof lifecycle (implemented slice)", () => {
     expect(milestone.policyId).toBe(policy.id);
     expect(policy.allowedRoles).toEqual([Role.AUDITOR]);
 
+    const client = await registerClient("Golden Client");
     const postProject = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${token}`)
-      .send({ name: "HTTP Project" });
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "HTTP Project", contractorId: contractor!.id });
     expect(postProject.status).toBe(201);
     expect(postProject.body.data.project.name).toBe("HTTP Project");
     expect(postProject.body.data.project.contractorId).toBe(contractor!.id);

@@ -14,8 +14,8 @@ import { variationsRouter } from "./variations.routes";
 import { passportsRouter } from "./passports.routes";
 import { blockchainRouter } from "./blockchain.routes";
 import { publicRouter } from "./public.routes";
-import { crbRouter } from "./crb.routes";
 import { nestRouter } from "./nest.routes";
+import { procurementRouter } from "./procurement.routes";
 
 export const apiRouter = Router();
 
@@ -34,5 +34,7 @@ apiRouter.use("/variations", variationsRouter);
 apiRouter.use("/passports", passportsRouter);
 apiRouter.use("/blockchain", blockchainRouter);
 apiRouter.use("/public", publicRouter);
-apiRouter.use("/integrations/crb", crbRouter);
+// CRB is contractor-scoped and RBAC-protected under /contractors/:id/crb.
+// The old unaudited /integrations/crb/:registrationNumber lookup was removed.
 apiRouter.use("/integrations/nest", nestRouter);
+apiRouter.use("/procurement", procurementRouter);

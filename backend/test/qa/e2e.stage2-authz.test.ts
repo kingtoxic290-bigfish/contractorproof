@@ -12,7 +12,7 @@ import {
 describe("Stage 2 GET contractors/projects authorization", () => {
   afterEach(cleanupQaUsers);
 
-  it("does not list or return another contractor's records", async () => {
+  it("scopes contractor projects while exposing assignable contractors and client-owned projects", async () => {
     const owner = await registerContractor("Listed Owner");
     const stranger = await registerContractor("Stranger Reader");
     const client = await registerClient("Listed Client");
@@ -27,18 +27,43 @@ describe("Stage 2 GET contractors/projects authorization", () => {
     expect(contractorIds).not.toContain(owner.contractorId);
     assertNoSecrets(contractors.body);
 
+    const assignableContractors = await request(app)
+      .get("/api/v1/contractors")
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(assignableContractors.status).toBe(200);
+    expect(assignableContractors.body.contractors.map((row: { id: string }) => row.id)).toContain(owner.contractorId);
+
     const contractorDetail = await request(app)
       .get(`/api/v1/contractors/${owner.contractorId}`)
       .set("Authorization", `Bearer ${client.token}`);
-    expect(contractorDetail.status).toBe(403);
+    expect(contractorDetail.status).toBe(200);
     assertNoSecrets(contractorDetail.body);
+
+    const clientProject = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Client-owned project", contractorId: owner.contractorId });
+    expect(clientProject.status).toBe(201);
+    const clientProjectId = clientProject.body.data.project.id as string;
 
     const projects = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(projects.status).toBe(200);
     expect(projects.body.projects.map((row: { id: string }) => row.id)).not.toContain(project.id);
+    expect(projects.body.projects.map((row: { id: string }) => row.id)).not.toContain(clientProjectId);
     assertNoSecrets(projects.body);
+
+    const clientProjects = await request(app)
+      .get("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(clientProjects.status).toBe(200);
+    expect(clientProjects.body.projects.map((row: { id: string }) => row.id)).toEqual([clientProjectId]);
+
+    const ownProjectDetail = await request(app)
+      .get(`/api/v1/projects/${clientProjectId}`)
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(ownProjectDetail.status).toBe(200);
 
     const projectDetail = await request(app)
       .get(`/api/v1/projects/${project.id}`)

@@ -3,20 +3,21 @@ import { asNullableString, asRequiredString, isPlainRecord } from "../shared/que
 import type { Role } from "../../types/roles";
 
 /**
- * Roles that pass the VERIFY_INTERNAL gate on POST /api/v1/verification.
- * CONTRACTOR is never included. The API remains authoritative.
+ * Roles whose project scope currently supports the internal verification UI.
+ * CONSULTANT_ENGINEER passes the backend role gate but has no project membership
+ * scope, so this UI keeps that role restricted rather than bypassing ownership.
  */
 export const VERIFY_INTERNAL_ROLES: Role[] = [
   "ADMIN",
   "AUDITOR",
   "PROCUREMENT_OFFICER",
-  "CONSULTANT_ENGINEER",
-  "CLIENT",
 ];
+
+export const VERIFICATION_PAGE_ROLES: Role[] = [...VERIFY_INTERNAL_ROLES, "CLIENT"];
 
 /**
  * Roles that pass the ATTEST gate on POST /api/v1/attestations.
- * Same set as VERIFY_INTERNAL. CONTRACTOR is never included.
+ * The verification UI is separately limited to roles with supported project scope.
  */
 export const ATTEST_ROLES: Role[] = [
   "CONSULTANT_ENGINEER",

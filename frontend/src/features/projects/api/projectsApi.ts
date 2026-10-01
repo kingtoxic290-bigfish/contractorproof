@@ -4,8 +4,8 @@ import { parsePublicProject, type PublicProject } from "../types";
 
 export type ProjectCreateInput = {
   name: string;
+  contractorId: string;
   description?: string;
-  contractorId?: string;
   nestTenderReference?: string;
   nestContractReference?: string;
   ocid?: string;
@@ -47,7 +47,7 @@ export async function createProject(input: ProjectCreateInput): Promise<PublicPr
     body: {
       name: input.name,
       ...(input.description ? { description: input.description } : {}),
-      ...(input.contractorId ? { contractorId: input.contractorId } : {}),
+      contractorId: input.contractorId,
       ...(input.nestTenderReference ? { nestTenderReference: input.nestTenderReference } : {}),
       ...(input.nestContractReference ? { nestContractReference: input.nestContractReference } : {}),
       ...(input.ocid ? { ocid: input.ocid } : {}),
@@ -62,6 +62,19 @@ export async function createProject(input: ProjectCreateInput): Promise<PublicPr
   const project = record ? parsePublicProject(record) : null;
   if (!project) {
     throw new Error("The project creation response is not in a known format.");
+  }
+  return project;
+}
+
+export async function assignProjectContractor(projectId: string, contractorId: string): Promise<PublicProject> {
+  const payload = await apiRequest<unknown>(`/projects/${encodeURIComponent(projectId)}/contractor`, {
+    method: "PATCH",
+    body: { contractorId },
+  });
+  const record = isPlainRecord(payload) && isPlainRecord(payload.data) ? payload.data.project : undefined;
+  const project = record ? parsePublicProject(record) : null;
+  if (!project) {
+    throw new Error("The contractor assignment response is not in a known format.");
   }
   return project;
 }

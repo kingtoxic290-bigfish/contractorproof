@@ -14,7 +14,7 @@ export type PublicContractor = {
   crbClass: string | null;
   crbStatus: string | null;
   crbLastVerifiedAt: string | null;
-  crbSource: string;
+  crbSource: string | null;
   createdAt: string;
   updatedAt: string;
   user: PublicUser;
@@ -44,11 +44,14 @@ export function parsePublicContractor(value: unknown): PublicContractor | null {
   const id = asRequiredString(value.id);
   const userId = asRequiredString(value.userId);
   const legalName = asRequiredString(value.legalName);
-  const crbSource = asRequiredString(value.crbSource);
+  // The API returns null until a CRB check has actually been performed against
+  // a source, so this field must stay nullable. Treating it as required caused
+  // a single such record to reject the whole contractor collection.
+  const crbSource = asNullableString(value.crbSource);
   const createdAt = asRequiredString(value.createdAt);
   const updatedAt = asRequiredString(value.updatedAt);
   const user = parsePublicUser(value.user);
-  if (!id || !userId || !legalName || !crbSource || !createdAt || !updatedAt || !user) {
+  if (!id || !userId || !legalName || !createdAt || !updatedAt || !user) {
     return null;
   }
 

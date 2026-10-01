@@ -3,17 +3,17 @@ import type { PublicVerificationProof } from "../types";
 /** Displays only proof metadata returned alongside this verification result. */
 export function BlockchainProof({ proof }: { proof: PublicVerificationProof | null }) {
   const state = !proof
-    ? "NO PROOF"
+    ? "No proof"
     : proof.txHash && proof.blockNumber != null && proof.blockNumber > 0
-      ? "CONFIRMED"
-      : "PENDING";
+      ? "Confirmed"
+      : "Pending";
 
   return (
     <div className="rounded-md border border-stone-200 bg-stone-50 px-3 py-3">
       <h3 className="text-sm font-medium text-stone-900">Blockchain proof</h3>
-      <p className="mt-1 text-sm text-stone-800">Status: {state}</p>
+      <p className="mt-1 text-sm font-semibold text-stone-800">Status: {state}</p>
       <p className="mt-2 text-sm text-stone-600">
-        {state === "NO PROOF"
+        {state === "No proof"
           ? "The verification response did not include blockchain proof metadata."
           : "Proof metadata is shown only as returned by the verification response. It does not prove the underlying claim is true."}
       </p>

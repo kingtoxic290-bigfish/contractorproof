@@ -27,9 +27,9 @@ export function VerificationCompare({
     return (
       <Card
         title="Compare fingerprints"
-        description="CONTRACTOR accounts cannot verify evidence, including their own uploads. The API remains authoritative."
+        description="Starting a technical comparison is restricted to authorized internal reviewer roles."
       >
-        <p className="text-sm text-stone-600">Fingerprint comparison is not available for this role.</p>
+        <p className="text-sm text-stone-600">You can view recorded technical results, but cannot initiate or alter a comparison.</p>
       </Card>
     );
   }
@@ -50,7 +50,7 @@ export function VerificationCompare({
   return (
     <Card
       title="Compare fingerprints"
-      description="POST /api/v1/verification compares presented or stored bytes to EvidenceVersion.sha256. MATCH is not VERIFIED and is not an attestation."
+      description="Compare the evidence fingerprint to the recorded SHA-256. MATCH means the bytes match the anchored fingerprint. MATCH is not a verification decision and does not constitute an attestation."
     >
       <form
         className="space-y-4"

@@ -23,7 +23,7 @@ export function PassportsPage() {
         onRetry={() => void official.retry()}
         loadingMessage="Loading contractor passports..."
         emptyTitle="No passport records available."
-        emptyDescription="The backend returned no project passport records accessible to this account."
+        emptyDescription="No passport records were found for this account."
       >
         {official.data ? (
           <div className="space-y-4">
@@ -66,7 +66,7 @@ export function PassportsPage() {
             ))}
           </div>
         ) : (
-          <EmptyState title="Passport records unavailable." description="The backend did not return a usable passport projection." />
+          <EmptyState title="Passport records unavailable." description="No passport records are available for this account." />
         )}
       </QueryPanel>
     </section>

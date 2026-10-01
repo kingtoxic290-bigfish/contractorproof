@@ -1,7 +1,17 @@
-import type { Milestone, Prisma, Project, VerificationPolicy } from "@prisma/client";
+import type { Milestone, Prisma, VerificationPolicy } from "@prisma/client";
 import { prisma } from "./prisma";
 
+const projectPublicInclude = {
+  client: { select: { id: true, fullName: true } },
+  contractor: { select: { id: true, legalName: true } },
+} satisfies Prisma.ProjectInclude;
+
+export type ProjectWithRelations = Prisma.ProjectGetPayload<{
+  include: typeof projectPublicInclude;
+}>;
+
 export type CreateProjectInput = {
+  clientId?: string | null;
   contractorId: string;
   name: string;
   description?: string | null;
@@ -22,28 +32,39 @@ export type CreateMilestoneInput = {
 };
 
 export const projectRepository = {
-  listProjects(): Promise<Project[]> {
+  listProjects(): Promise<ProjectWithRelations[]> {
     return prisma.project.findMany({
+      include: projectPublicInclude,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     });
   },
 
-  findAccessible(where: Prisma.ProjectWhereInput): Promise<Project[]> {
+  findAccessible(where: Prisma.ProjectWhereInput): Promise<ProjectWithRelations[]> {
     return prisma.project.findMany({
       where,
+      include: projectPublicInclude,
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     });
   },
 
-  getProjectById(id: string): Promise<Project | null> {
+  getProjectById(id: string): Promise<ProjectWithRelations | null> {
     return prisma.project.findUnique({
       where: { id },
+      include: projectPublicInclude,
     });
   },
 
-  createProject(input: CreateProjectInput): Promise<Project> {
+  hasClientProjectForContractor(clientId: string, contractorId: string): Promise<boolean> {
+    return prisma.project.findFirst({
+      where: { clientId, contractorId },
+      select: { id: true },
+    }).then(Boolean);
+  },
+
+  createProject(input: CreateProjectInput): Promise<ProjectWithRelations> {
     return prisma.project.create({
       data: {
+        clientId: input.clientId ?? null,
         contractorId: input.contractorId,
         name: input.name,
         description: input.description ?? null,
@@ -55,6 +76,15 @@ export const projectRepository = {
         contractStartDate: input.contractStartDate ?? null,
         contractEndDate: input.contractEndDate ?? null,
       },
+      include: projectPublicInclude,
+    });
+  },
+
+  updateProjectContractor(projectId: string, contractorId: string): Promise<ProjectWithRelations> {
+    return prisma.project.update({
+      where: { id: projectId },
+      data: { contractorId },
+      include: projectPublicInclude,
     });
   },
 

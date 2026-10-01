@@ -7,36 +7,43 @@ import {
   privileged,
   registerClient,
   registerContractor,
+  uploadEvidence,
 } from "./qa/fixtures";
 
 describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
   afterEach(cleanupQaUsers);
 
-  it("creates a project for the authenticated contractor and ignores client contractorId", async () => {
-    const owner = await registerContractor("Write Owner");
+  it("creates a client-owned project and assigns only a real selected contractor", async () => {
+    const client = await registerClient("Project Client");
+    const owner = await registerContractor("Assigned Contractor");
     const other = await registerContractor("Other Contractor");
 
     const created = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({
         name: "Owned Project",
         description: "created over HTTP",
-        contractorId: other.contractorId,
+        contractorId: owner.contractorId,
+        clientId: other.userId,
       });
 
     expect(created.status).toBe(201);
     expect(created.body.data.project).toMatchObject({
       name: "Owned Project",
       description: "created over HTTP",
+      clientId: client.userId,
+      clientName: "Project Client",
       contractorId: owner.contractorId,
+      contractorName: "Assigned Contractor",
     });
     expect(created.body.data.project.contractorId).not.toBe(other.contractorId);
+    expect(created.body.data.project.clientId).not.toBe(other.userId);
     expect(created.body.data.project.id).toEqual(expect.any(String));
   });
 
   it("returns 401 without a JWT and 400 when name is missing", async () => {
-    const owner = await registerContractor("Validation Owner");
+    const owner = await registerClient("Validation Owner");
 
     const unauthenticated = await request(app).post("/api/v1/projects").send({ name: "X" });
     expect(unauthenticated.status).toBe(401);
@@ -49,13 +56,68 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
     expect(missingName.body.error.code).toBe("VALIDATION_ERROR");
   });
 
-  it("forbids a client from creating a project", async () => {
-    const client = await registerClient("Project Client");
+  it("forbids a contractor from creating or self-assigning a project", async () => {
+    const contractor = await registerContractor("Forbidden Project Creator");
     const response = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${client.token}`)
-      .send({ name: "Client Project" });
+      .set("Authorization", `Bearer ${contractor.token}`)
+      .send({ name: "Forbidden Project", contractorId: contractor.contractorId });
     expect(response.status).toBe(403);
+  });
+
+  it("requires a valid assigned contractor for a client-owned project", async () => {
+    const client = await registerClient("Missing Assignment Client");
+    const missing = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "No Contractor" });
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("lets only the owning client reassign the contractor and transfers project access", async () => {
+    const client = await registerClient("Assignment Owner");
+    const unrelatedClient = await registerClient("Unrelated Assignment Owner");
+    const originalContractor = await registerContractor("Original Assignee");
+    const replacementContractor = await registerContractor("Replacement Assignee");
+    const project = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Assignable Project", contractorId: originalContractor.contractorId });
+    const projectId = project.body.data.project.id as string;
+
+    const contractorAttempt = await request(app)
+      .patch(`/api/v1/projects/${projectId}/contractor`)
+      .set("Authorization", `Bearer ${originalContractor.token}`)
+      .send({ contractorId: replacementContractor.contractorId });
+    expect(contractorAttempt.status).toBe(403);
+
+    const unrelatedClientAttempt = await request(app)
+      .patch(`/api/v1/projects/${projectId}/contractor`)
+      .set("Authorization", `Bearer ${unrelatedClient.token}`)
+      .send({ contractorId: replacementContractor.contractorId });
+    expect(unrelatedClientAttempt.status).toBe(403);
+
+    const reassigned = await request(app)
+      .patch(`/api/v1/projects/${projectId}/contractor`)
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ contractorId: replacementContractor.contractorId, clientId: unrelatedClient.userId });
+    expect(reassigned.status).toBe(200);
+    expect(reassigned.body.data.project).toMatchObject({
+      id: projectId,
+      clientId: client.userId,
+      contractorId: replacementContractor.contractorId,
+      contractorName: "Replacement Assignee",
+    });
+
+    const originalAccess = await request(app)
+      .get(`/api/v1/projects/${projectId}`)
+      .set("Authorization", `Bearer ${originalContractor.token}`);
+    expect(originalAccess.status).toBe(403);
+    const replacementAccess = await request(app)
+      .get(`/api/v1/projects/${projectId}`)
+      .set("Authorization", `Bearer ${replacementContractor.token}`);
+    expect(replacementAccess.status).toBe(200);
   });
 
   it("lets ADMIN create a project for a contractor and rejects a missing contractorId", async () => {
@@ -76,18 +138,19 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
     expect(created.body.data.project.contractorId).toBe(owner.contractorId);
   });
 
-  it("creates a milestone under an owned project via POST /milestones and the nested route", async () => {
-    const owner = await registerContractor("Milestone Owner");
+  it("lets the owning client configure milestones and forbids contractor configuration", async () => {
+    const owner = await registerContractor("Assigned Milestone Contractor");
+    const client = await registerClient("Milestone Owner");
     const project = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`)
-      .send({ name: "Milestone Project" });
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Milestone Project", contractorId: owner.contractorId });
     expect(project.status).toBe(201);
     const projectId = project.body.data.project.id as string;
 
     const nested = await request(app)
       .post(`/api/v1/projects/${projectId}/milestones`)
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ name: "Foundation", description: "first package" });
     expect(nested.status).toBe(201);
     expect(nested.body.data.milestone).toMatchObject({
@@ -99,30 +162,75 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
 
     const collection = await request(app)
       .post("/api/v1/milestones")
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ projectId, name: "Structure" });
     expect(collection.status).toBe(201);
     expect(collection.body.data.milestone.projectId).toBe(projectId);
     expect(collection.body.data.milestone.name).toBe("Structure");
+
+    const contractorAttempt = await request(app)
+      .post(`/api/v1/projects/${projectId}/milestones`)
+      .set("Authorization", `Bearer ${owner.token}`)
+      .send({ name: "Contractor Configured Milestone" });
+    expect(contractorAttempt.status).toBe(403);
+  });
+
+  it("lets the assigned contractor submit evidence and only the owning client review it", async () => {
+    const assigned = await registerContractor("Evidence Assigned Contractor");
+    const unrelated = await registerContractor("Evidence Unrelated Contractor");
+    const client = await registerClient("Evidence Project Client");
+    const unrelatedClient = await registerClient("Unrelated Evidence Client");
+    const project = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Evidence Project", contractorId: assigned.contractorId });
+    const projectId = project.body.data.project.id as string;
+    const milestone = await request(app)
+      .post(`/api/v1/projects/${projectId}/milestones`)
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Submitted Work" });
+    const milestoneId = milestone.body.data.milestone.id as string;
+
+    const upload = await uploadEvidence(assigned.token, milestoneId, Buffer.from("assigned evidence"), "work.txt");
+    expect(upload.status).toBe(201);
+    const evidenceId = upload.body.data.evidence.id as string;
+
+    const clientEvidence = await request(app)
+      .get(`/api/v1/evidence?projectId=${projectId}`)
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(clientEvidence.status).toBe(200);
+    expect(clientEvidence.body.data.evidence.map((record: { id: string }) => record.id)).toContain(evidenceId);
+
+    const unrelatedEvidence = await request(app)
+      .get(`/api/v1/evidence?projectId=${projectId}`)
+      .set("Authorization", `Bearer ${unrelatedClient.token}`);
+    expect(unrelatedEvidence.status).toBe(200);
+    expect(unrelatedEvidence.body.data.evidence).toEqual([]);
+
+    const unrelatedProjectRead = await request(app)
+      .get(`/api/v1/projects/${projectId}`)
+      .set("Authorization", `Bearer ${unrelated.token}`);
+    expect(unrelatedProjectRead.status).toBe(403);
   });
 
   it("returns 400 when milestone name or projectId is missing", async () => {
-    const owner = await registerContractor("Milestone Validation");
+    const owner = await registerContractor("Milestone Validation Contractor");
+    const client = await registerClient("Milestone Validation Client");
     const project = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`)
-      .send({ name: "Validation Project" });
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Validation Project", contractorId: owner.contractorId });
     const projectId = project.body.data.project.id as string;
 
     const missingName = await request(app)
       .post("/api/v1/milestones")
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ projectId });
     expect(missingName.status).toBe(400);
 
     const missingProject = await request(app)
       .post("/api/v1/milestones")
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ name: "Orphan" });
     expect(missingProject.status).toBe(400);
   });
@@ -131,44 +239,56 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
 describe("project and milestone ownership / IDOR", () => {
   afterEach(cleanupQaUsers);
 
-  it("lets User A read their project and milestone and denies User B", async () => {
-    const owner = await registerContractor("Owner A");
-    const stranger = await registerContractor("Owner B");
+  it("scopes project access to the owning client and assigned contractor and denies unrelated IDs", async () => {
+    const contractor = await registerContractor("Assigned Contractor A");
+    const unrelatedContractor = await registerContractor("Assigned Contractor B");
+    const client = await registerClient("Owner A");
+    const stranger = await registerClient("Owner B");
 
     const created = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`)
-      .send({ name: "Project A" });
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Project A", contractorId: contractor.contractorId });
     expect(created.status).toBe(201);
     const projectId = created.body.data.project.id as string;
 
     const ownProject = await request(app)
       .get(`/api/v1/projects/${projectId}`)
-      .set("Authorization", `Bearer ${owner.token}`);
+      .set("Authorization", `Bearer ${client.token}`);
     expect(ownProject.status).toBe(200);
     expect(ownProject.body.project.id).toBe(projectId);
+
+    const assignedProject = await request(app)
+      .get(`/api/v1/projects/${projectId}`)
+      .set("Authorization", `Bearer ${contractor.token}`);
+    expect(assignedProject.status).toBe(200);
 
     const foreignProject = await request(app)
       .get(`/api/v1/projects/${projectId}`)
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(foreignProject.status).toBe(403);
 
-    const milestone = await request(app)
+    const unrelatedContractorProject = await request(app)
+      .get(`/api/v1/projects/${projectId}`)
+      .set("Authorization", `Bearer ${unrelatedContractor.token}`);
+    expect(unrelatedContractorProject.status).toBe(403);
+
+    const createdMilestone = await request(app)
       .post("/api/v1/milestones")
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ projectId, name: "Milestone A" });
-    expect(milestone.status).toBe(201);
-    const milestoneId = milestone.body.data.milestone.id as string;
+    expect(createdMilestone.status).toBe(201);
+    const milestoneId = createdMilestone.body.data.milestone.id as string;
 
     const ownMilestone = await request(app)
       .get(`/api/v1/milestones/${milestoneId}`)
-      .set("Authorization", `Bearer ${owner.token}`);
+      .set("Authorization", `Bearer ${contractor.token}`);
     expect(ownMilestone.status).toBe(200);
     expect(ownMilestone.body.milestone.id).toBe(milestoneId);
 
     const foreignMilestone = await request(app)
       .get(`/api/v1/milestones/${milestoneId}`)
-      .set("Authorization", `Bearer ${stranger.token}`);
+      .set("Authorization", `Bearer ${unrelatedContractor.token}`);
     expect(foreignMilestone.status).toBe(403);
 
     const foreignCreate = await request(app)
@@ -179,28 +299,51 @@ describe("project and milestone ownership / IDOR", () => {
 
     const ownList = await request(app)
       .get("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`);
+      .set("Authorization", `Bearer ${client.token}`);
     expect(ownList.body.projects.map((row: { id: string }) => row.id)).toContain(projectId);
 
     const strangerList = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(strangerList.body.projects.map((row: { id: string }) => row.id)).not.toContain(projectId);
+
+    const contractorList = await request(app)
+      .get("/api/v1/projects")
+      .set("Authorization", `Bearer ${contractor.token}`);
+    expect(contractorList.body.projects.map((row: { id: string }) => row.id)).toContain(projectId);
+
+    const clientPassports = await request(app)
+      .get("/api/v1/passports")
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(clientPassports.status).toBe(200);
+    expect(clientPassports.body.data.passports.map((row: { project: { id: string } }) => row.project.id)).toContain(projectId);
+
+    const unrelatedPassports = await request(app)
+      .get("/api/v1/passports")
+      .set("Authorization", `Bearer ${stranger.token}`);
+    expect(unrelatedPassports.status).toBe(200);
+    expect(unrelatedPassports.body.data.passports).toEqual([]);
+
+    const assignedPassport = await request(app)
+      .get(`/api/v1/passports/${projectId}`)
+      .set("Authorization", `Bearer ${contractor.token}`);
+    expect(assignedPassport.status).toBe(200);
   });
 
   it("lets ADMIN read another contractor's project and milestone", async () => {
     const owner = await registerContractor("Admin Read Owner");
+    const client = await registerClient("Admin Read Client");
     const admin = await privileged(Role.ADMIN, "IDOR Admin");
     const auditor = await privileged(Role.AUDITOR, "IDOR Auditor");
 
     const created = await request(app)
       .post("/api/v1/projects")
-      .set("Authorization", `Bearer ${owner.token}`)
-      .send({ name: "Visible To Admin" });
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Visible To Admin", contractorId: owner.contractorId });
     const projectId = created.body.data.project.id as string;
     const milestone = await request(app)
       .post(`/api/v1/projects/${projectId}/milestones`)
-      .set("Authorization", `Bearer ${owner.token}`)
+      .set("Authorization", `Bearer ${client.token}`)
       .send({ name: "Admin Visible Milestone" });
     const milestoneId = milestone.body.data.milestone.id as string;
 

@@ -57,12 +57,29 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const { skipAuthRedirect, body, ...init } = options;
 
+  // Responses are authenticated, per-user and mutable, so the HTTP cache must
+  // not be used. Without this the browser revalidates with If-None-Match and
+  // Express (ETag on by default) answers 304 Not Modified, which carries no
+  // body and therefore cannot satisfy the { data, meta } envelope this client
+  // must preserve. Only bodyless requests opt out; mutations are untouched.
+  const cache = body === undefined ? "no-store" : init.cache;
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers,
+    cache,
     body:
       body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
   });
+
+  // A 304 is a cache revalidation result, not an API error and not a payload.
+  // It must never be parsed as an empty envelope.
+  if (response.status === 304) {
+    throw new ApiError(
+      304,
+      "The API returned a cached response with no body. Reload to fetch fresh data.",
+    );
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

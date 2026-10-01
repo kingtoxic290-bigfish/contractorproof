@@ -62,7 +62,7 @@ export function EvidencePage() {
     <section className="space-y-6">
       <PageHeader
         title="Evidence"
-        description="Evidence files are listed from GET /api/v1/evidence. A SHA-256 fingerprint proves file integrity, not that the underlying construction claim is true."
+        description="Evidence records carry a SHA-256 fingerprint that proves file integrity. A matching fingerprint does not prove that the underlying construction claim is true."
       />
 
       <Card title="Filter evidence" description="Optional project or milestone identifiers must be UUIDs. Inaccessible filters return an empty list.">
@@ -122,7 +122,7 @@ export function EvidencePage() {
           onRetry={() => void retry()}
           loadingMessage="Loading evidence..."
           emptyTitle="No evidence uploaded yet."
-          emptyDescription="The API returned no evidence records for this view."
+          emptyDescription="No evidence records were found for this view."
         >
           <EvidenceList records={records} />
         </QueryPanel>

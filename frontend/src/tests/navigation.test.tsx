@@ -1,6 +1,7 @@
 import { screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authApi } from "../services/api/auth";
+import { loadDashboard } from "../pages/dashboardApi";
 import { renderApp, seedSession } from "./renderApp";
 
 vi.mock("../services/api/auth", () => ({
@@ -9,6 +10,10 @@ vi.mock("../services/api/auth", () => ({
     login: vi.fn(),
     register: vi.fn(),
   },
+}));
+
+vi.mock("../pages/dashboardApi", () => ({
+  loadDashboard: vi.fn(),
 }));
 
 vi.mock("../services/api/client", async (importOriginal) => {
@@ -22,6 +27,7 @@ vi.mock("../services/api/client", async (importOriginal) => {
 describe("navigation", () => {
   beforeEach(() => {
     seedSession();
+    vi.mocked(loadDashboard).mockResolvedValue([]);
   });
 
   it("renders application navigation for an authenticated auditor", async () => {
@@ -34,9 +40,10 @@ describe("navigation", () => {
 
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: "Verification Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Operations Dashboard" })).toBeInTheDocument();
     expect(screen.getAllByRole("navigation", { name: "Application" }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Audit trail/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Verification/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("link", { name: /Audit trail/i })).not.toBeInTheDocument();
   });
 
   it("hides audit navigation for a contractor", async () => {
@@ -49,7 +56,53 @@ describe("navigation", () => {
 
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: "Verification Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Contractor Work Dashboard" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Audit trail/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /My Projects/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Create Project/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^Contractors/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Verification/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Variations/i })).not.toBeInTheDocument();
+    // The backend grants CORRECTION_READ / DISPUTE_READ to contractors for their
+    // own records, so these pages are reachable rather than hidden.
+    expect(screen.getByRole("link", { name: /Corrections/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Disputes/i })).toBeInTheDocument();
+  });
+
+  it("shows project management navigation to clients", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "client-1",
+      email: "client@example.com",
+      fullName: "Demo Client",
+      role: "CLIENT",
+    });
+    renderApp("/dashboard");
+
+    expect(await screen.findByRole("heading", { name: "Project Management Dashboard" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Create Project/i })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /Contractors/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
+  });
+
+  it.each(["AUDITOR", "PROCUREMENT_OFFICER"] as const)("allows %s to reach verification", async (role) => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "reviewer-1",
+      email: "reviewer@example.com",
+      fullName: "Internal Reviewer",
+      role,
+    });
+
+    renderApp("/verification");
+
+    expect(await screen.findByRole("heading", { name: "Verification" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Verification/i })).toBeInTheDocument();
+  });
+
+  it("shows public verification without authenticated project navigation", async () => {
+    renderApp("/verify");
+
+    expect(await screen.findByRole("heading", { name: "ContractorProof Verification" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Public verification" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Projects|Dashboard|Evidence/i })).not.toBeInTheDocument();
   });
 });

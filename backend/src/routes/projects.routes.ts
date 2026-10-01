@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { requirePermission } from "../authz/permissions";
 import {
+  assignProjectContractor,
   createProject,
   createProjectMilestone,
   getProject,
@@ -14,6 +15,7 @@ export const projectsRouter = Router();
 projectsRouter.use(authenticate);
 projectsRouter.post("/", requirePermission("PROJECT_WRITE"), createProject);
 projectsRouter.get("/", listProjects);
+projectsRouter.patch("/:projectId/contractor", requirePermission("PROJECT_WRITE"), assignProjectContractor);
 projectsRouter.post(
   "/:projectId/milestones",
   requirePermission("MILESTONE_WRITE"),

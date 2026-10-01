@@ -6,11 +6,7 @@ import { projectRepository } from "../repositories/project.repository";
 import { ApiError } from "../http/errors";
 import type { PublicUser } from "../types";
 
-/**
- * HTTP-boundary application of the frozen contracts.md matrix.
- * Agent 6 owns official ownership helpers; those are not shipped yet.
- * This module does not invent new roles or a second policy engine.
- */
+/** HTTP-boundary checks for project ownership, assignment, and contractor access. */
 const PRIVILEGED_READ_ROLES: Role[] = [
   Role.ADMIN,
   Role.AUDITOR,
@@ -38,9 +34,15 @@ export async function assertCanWriteProject(actor: PublicUser, projectId: string
     }
     return;
   }
-  if (actor.role !== Role.CONTRACTOR) {
+  if (actor.role === Role.CLIENT) {
+    const project = await projectRepository.getProjectById(projectId);
+    if (!project) {
+      throw new ApiError(404, "PROJECT_NOT_FOUND", "project not found");
+    }
+    if (project.clientId === actor.id) return;
     deny();
   }
+  if (actor.role !== Role.CONTRACTOR) deny();
   const ownerUserId = await ownerUserIdForProject(projectId);
   if (!ownerUserId) {
     throw new ApiError(404, "PROJECT_NOT_FOUND", "project not found");
@@ -48,6 +50,17 @@ export async function assertCanWriteProject(actor: PublicUser, projectId: string
   if (ownerUserId !== actor.id) {
     deny();
   }
+}
+
+export async function assertCanManageProject(actor: PublicUser, projectId: string): Promise<void> {
+  const project = await projectRepository.getProjectById(projectId);
+  if (!project) {
+    throw new ApiError(404, "PROJECT_NOT_FOUND", "project not found");
+  }
+  if (actor.role === Role.ADMIN || (actor.role === Role.CLIENT && project.clientId === actor.id)) {
+    return;
+  }
+  deny();
 }
 
 export async function assertCanReadProject(actor: PublicUser, projectId: string): Promise<void> {
@@ -65,6 +78,7 @@ export async function assertCanReadProject(actor: PublicUser, projectId: string)
     }
     return;
   }
+  if (actor.role === Role.CLIENT && project.clientId === actor.id) return;
   deny();
 }
 
@@ -79,7 +93,29 @@ export async function assertCanReadContractor(
   if (PRIVILEGED_READ_ROLES.includes(actor.role)) {
     return;
   }
+  if (actor.role === Role.CLIENT) {
+    return;
+  }
   if (actor.role === Role.CONTRACTOR && contractor.userId === actor.id) {
+    return;
+  }
+  deny();
+}
+
+export async function assertCanReadProcurementForContractor(
+  actor: PublicUser,
+  contractorId: string,
+): Promise<void> {
+  const contractor = await contractorRepository.getContractorById(contractorId);
+  if (!contractor) {
+    throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
+  }
+  if (PRIVILEGED_READ_ROLES.includes(actor.role)) return;
+  if (actor.role === Role.CONTRACTOR && contractor.userId === actor.id) return;
+  if (
+    actor.role === Role.CLIENT &&
+    await projectRepository.hasClientProjectForContractor(actor.id, contractorId)
+  ) {
     return;
   }
   deny();
@@ -94,6 +130,9 @@ export function projectListWhere(actor: PublicUser): Prisma.ProjectWhereInput {
   }
   if (actor.role === Role.CONTRACTOR) {
     return { contractor: { userId: actor.id } };
+  }
+  if (actor.role === Role.CLIENT) {
+    return { clientId: actor.id };
   }
   return { id: { in: [] } };
 }
@@ -121,6 +160,9 @@ export function contractorListWhere(actor: PublicUser): Prisma.ContractorWhereIn
   if (actor.role === Role.CONTRACTOR) {
     return { userId: actor.id };
   }
+  if (actor.role === Role.CLIENT) {
+    return {};
+  }
   return { id: { in: [] } };
 }
 
@@ -133,6 +175,13 @@ export async function assertCanWriteMilestone(
     if (!milestone) {
       throw new ApiError(404, "MILESTONE_NOT_FOUND", "milestone not found");
     }
+    return;
+  }
+  if (actor.role === Role.CLIENT) {
+    if (!milestone) {
+      throw new ApiError(404, "MILESTONE_NOT_FOUND", "milestone not found");
+    }
+    await assertCanWriteProject(actor, milestone.projectId);
     return;
   }
   if (actor.role !== Role.CONTRACTOR) {
@@ -152,20 +201,9 @@ export function evidenceListWhere(
   actor: PublicUser,
   filters: { milestoneId?: string; projectId?: string } = {},
 ): Prisma.EvidenceWhereInput {
-  if (!PRIVILEGED_READ_ROLES.includes(actor.role) && actor.role !== Role.CONTRACTOR) {
-    return { id: { in: [] } };
-  }
-
-  const access: Prisma.EvidenceWhereInput =
-    actor.role === Role.CONTRACTOR
-      ? {
-          milestone: {
-            project: {
-              contractor: { userId: actor.id },
-            },
-          },
-        }
-      : {};
+  const access: Prisma.EvidenceWhereInput = {
+    milestone: { project: projectListWhere(actor) },
+  };
 
   const extra: Prisma.EvidenceWhereInput[] = [];
   if (filters.milestoneId) {
@@ -186,20 +224,9 @@ export function attestationListWhere(
   actor: PublicUser,
   filters: { milestoneId?: string; projectId?: string; evidenceId?: string } = {},
 ): Prisma.AttestationWhereInput {
-  if (!PRIVILEGED_READ_ROLES.includes(actor.role) && actor.role !== Role.CONTRACTOR) {
-    return { id: { in: [] } };
-  }
-
-  const access: Prisma.AttestationWhereInput =
-    actor.role === Role.CONTRACTOR
-      ? {
-          milestone: {
-            project: {
-              contractor: { userId: actor.id },
-            },
-          },
-        }
-      : {};
+  const access: Prisma.AttestationWhereInput = {
+    milestone: { project: projectListWhere(actor) },
+  };
 
   const extra: Prisma.AttestationWhereInput[] = [];
   if (filters.milestoneId) {
@@ -226,20 +253,9 @@ export function disputeListWhere(
   actor: PublicUser,
   filters: { milestoneId?: string; projectId?: string } = {},
 ): Prisma.DisputeWhereInput {
-  if (!PRIVILEGED_READ_ROLES.includes(actor.role) && actor.role !== Role.CONTRACTOR) {
-    return { id: { in: [] } };
-  }
-
-  const access: Prisma.DisputeWhereInput =
-    actor.role === Role.CONTRACTOR
-      ? {
-          milestone: {
-            project: {
-              contractor: { userId: actor.id },
-            },
-          },
-        }
-      : {};
+  const access: Prisma.DisputeWhereInput = {
+    milestone: { project: projectListWhere(actor) },
+  };
 
   const extra: Prisma.DisputeWhereInput[] = [];
   if (filters.milestoneId) {
@@ -262,20 +278,9 @@ export function correctionListWhere(
   actor: PublicUser,
   filters: { milestoneId?: string; projectId?: string } = {},
 ): Prisma.CorrectionWhereInput {
-  if (!PRIVILEGED_READ_ROLES.includes(actor.role) && actor.role !== Role.CONTRACTOR) {
-    return { id: { in: [] } };
-  }
-
-  const access: Prisma.CorrectionWhereInput =
-    actor.role === Role.CONTRACTOR
-      ? {
-          milestone: {
-            project: {
-              contractor: { userId: actor.id },
-            },
-          },
-        }
-      : {};
+  const access: Prisma.CorrectionWhereInput = {
+    milestone: { project: projectListWhere(actor) },
+  };
 
   const extra: Prisma.CorrectionWhereInput[] = [];
   if (filters.milestoneId) {
@@ -371,7 +376,12 @@ export async function assertCanCreateVerification(
   actor: PublicUser,
   target: { evidenceId?: string; evidenceVersionId?: string },
 ): Promise<void> {
-  if (actor.role === Role.CONTRACTOR) {
+  if (
+    actor.role !== Role.ADMIN &&
+    actor.role !== Role.AUDITOR &&
+    actor.role !== Role.PROCUREMENT_OFFICER &&
+    actor.role !== Role.CONSULTANT_ENGINEER
+  ) {
     deny();
   }
   await assertCanAccessVerificationTarget(actor, target);

@@ -2,8 +2,11 @@ import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
+import { ErrorState } from "../../../components/feedback/ErrorState";
 import { PageHeader } from "../../../components/ui/PageHeader";
+import { useAuth } from "../../../hooks/useAuth";
 import { ApiError } from "../../../services/api/errors";
+import { useContractors } from "../../contractors/hooks/useContractors";
 import { createProject } from "../api/projectsApi";
 
 function normalizeError(error: unknown): string {
@@ -14,18 +17,26 @@ function normalizeError(error: unknown): string {
 }
 
 export function ProjectCreatePage() {
+  const { user } = useAuth();
+  const contractors = useContractors();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("");
+  const [contractorId, setContractorId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successId, setSuccessId] = useState<string | null>(null);
+  const [assignedContractorName, setAssignedContractorName] = useState<string | null>(null);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Project name is required.");
+      return;
+    }
+    if (!contractorId) {
+      setError("Select a contractor to assign to this project.");
       return;
     }
 
@@ -36,13 +47,16 @@ export function ProjectCreatePage() {
     try {
       const created = await createProject({
         name: trimmed,
+        contractorId,
         description: description.trim() || undefined,
         contractStatus: status.trim() || undefined,
       });
       setSuccessId(created.id);
+      setAssignedContractorName(contractors.records.find((contractor) => contractor.id === contractorId)?.legalName ?? null);
       setName("");
       setDescription("");
       setStatus("");
+      setContractorId("");
     } catch (caught) {
       setError(normalizeError(caught));
     } finally {
@@ -53,8 +67,10 @@ export function ProjectCreatePage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="New project"
-        description="Create a project using the backend's real create endpoint. The backend remains authoritative for role checks and validation."
+        title="Create Project"
+        description={user?.role === "CLIENT"
+          ? "Create a client-owned project and assign an existing contractor in the same request."
+          : "Create a project and assign an existing contractor. The system validates the contractor assignment."}
       />
       <div className="flex items-center justify-between gap-3">
         <Link
@@ -65,7 +81,7 @@ export function ProjectCreatePage() {
         </Link>
       </div>
 
-      <Card title="Create project" description="Only required fields are enforced on the client; the backend validates the final payload.">
+      <Card title="Project details" description="The project owner is derived from your signed-in account. A contractor must be selected before submission.">
         <form className="grid gap-4" onSubmit={onSubmit} noValidate>
           <label className="block text-sm" htmlFor="project-name">
             <span className="mb-1 block font-medium text-stone-800">Project name</span>
@@ -84,6 +100,37 @@ export function ProjectCreatePage() {
               required
             />
           </label>
+
+          <label className="block text-sm" htmlFor="project-contractor">
+            <span className="mb-1 block font-medium text-stone-800">Assign contractor</span>
+            <select
+              id="project-contractor"
+              value={contractorId}
+              onChange={(event) => {
+                setContractorId(event.target.value);
+                setError(null);
+                setSuccessId(null);
+              }}
+              disabled={contractors.status === "loading" || contractors.records.length === 0}
+              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+              required
+            >
+              <option value="">
+                {contractors.status === "loading" ? "Loading contractors..." : "Select a contractor"}
+              </option>
+              {contractors.records.map((contractor) => (
+                <option key={contractor.id} value={contractor.id}>
+                  {contractor.legalName}{contractor.crbRegistrationNumber ? ` · ${contractor.crbRegistrationNumber}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          {contractors.status === "error" || contractors.status === "forbidden" || contractors.status === "unauthorized" ? (
+            <ErrorState message={contractors.error ?? "Contractors could not be loaded."} onRetry={() => void contractors.retry()} />
+          ) : null}
+          {contractors.status === "empty" ? (
+            <p className="text-sm text-stone-600">No contractors are available to assign.</p>
+          ) : null}
 
           <label className="block text-sm" htmlFor="project-description">
             <span className="mb-1 block font-medium text-stone-800">Description</span>
@@ -115,7 +162,7 @@ export function ProjectCreatePage() {
 
           {successId ? (
             <div className="space-y-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-700">
-              <p>Project created successfully.</p>
+              <p>Project created and assigned{assignedContractorName ? ` to ${assignedContractorName}` : ""}.</p>
               <Link
                 to={`/projects/${encodeURIComponent(successId)}`}
                 className="inline-flex items-center rounded-md bg-emerald-700 px-3 py-2 font-medium text-white hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-800"
@@ -127,7 +174,7 @@ export function ProjectCreatePage() {
 
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Creating..." : "Create project"}
+              {submitting ? "Creating project..." : "Create Project and Assign Contractor"}
             </Button>
           </div>
         </form>

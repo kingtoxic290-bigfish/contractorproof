@@ -1,7 +1,7 @@
 import { BlockchainEventType, Role, VariationStatus, type Prisma } from "@prisma/client";
 import { ApiError } from "../http/errors";
 import { prisma } from "../repositories/prisma";
-import { assertCanReadProject, assertCanWriteProject } from "./access.service";
+import { assertCanReadProject, assertCanWriteProject, projectListWhere } from "./access.service";
 import { proofService, type ProofView } from "./proof.service";
 import type { PublicUser } from "../types";
 
@@ -131,7 +131,8 @@ export const variationService = {
   async list(actor: PublicUser, projectId?: string): Promise<VariationRecord[]> {
     if (projectId) await assertCanReadProject(actor, projectId);
     const where: Prisma.ContractVariationWhereInput = {
-      ...(projectId ? { projectId } : actor.role === Role.CONTRACTOR ? { project: { contractor: { userId: actor.id } } } : resolverRoles.includes(actor.role) ? {} : { id: { in: [] } }),
+      project: projectListWhere(actor),
+      ...(projectId ? { projectId } : {}),
     };
     return prisma.contractVariation.findMany({ where, include: variationInclude, orderBy: [{ createdAt: "desc" }, { id: "asc" }] });
   },

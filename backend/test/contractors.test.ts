@@ -103,7 +103,8 @@ describe("GET /api/v1/contractors", () => {
       id: contractorId,
       userId: account.userId,
       legalName: account.fullName,
-      crbSource: "SYNTHETIC_DEMO",
+      crbSource: null,
+      crbStatus: null,
       user: {
         id: account.userId,
         email: account.email,
@@ -177,7 +178,7 @@ describe("GET /api/v1/contractors/:contractorId", () => {
       crbClass: null,
       crbStatus: null,
       crbLastVerifiedAt: null,
-      crbSource: "SYNTHETIC_DEMO",
+      crbSource: null,
       user: {
         id: account.userId,
         email: account.email,

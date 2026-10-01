@@ -124,7 +124,7 @@ describe("verification page", () => {
   it("shows the backend-backed empty review queue", async () => {
     vi.mocked(listEvidence).mockResolvedValue([]);
     renderApp("/verification");
-    expect(await screen.findByText("No evidence available to review.")).toBeInTheDocument();
+    expect(await screen.findByText("No evidence is currently available to review.")).toBeInTheDocument();
     expect(createVerification).not.toHaveBeenCalled();
   });
 
@@ -136,6 +136,25 @@ describe("verification page", () => {
     expect(screen.getByText(pending.sha256)).toBeInTheDocument();
     expect(screen.queryByText("Verified")).not.toBeInTheDocument();
     expect(screen.queryByText(/99% verified|trust score|integrity score/i)).not.toBeInTheDocument();
+    expect(createVerification).not.toHaveBeenCalled();
+  });
+
+  it("lets a client inspect verification history and review evidence without initiating technical comparison", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "client-1",
+      email: "client@example.com",
+      fullName: "Project Client",
+      role: "CLIENT",
+    });
+    vi.mocked(listVerificationHistory).mockResolvedValue([historicalMatch]);
+
+    renderApp(reviewPath());
+
+    expect(await screen.findByRole("heading", { name: "Verification" })).toBeInTheDocument();
+    expect(await screen.findByText("Persisted verification history")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Human review" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Record APPROVED attestation" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Compare stored fingerprint|Compare presented file/ })).not.toBeInTheDocument();
     expect(createVerification).not.toHaveBeenCalled();
   });
 
@@ -169,7 +188,7 @@ describe("verification page", () => {
     expect(
       screen.getByText(/does not mean the blockchain independently proves/i),
     ).toBeInTheDocument();
-    expect(screen.getByText("Status: NO PROOF")).toBeInTheDocument();
+    expect(screen.getByText("Status: No proof")).toBeInTheDocument();
     expect(screen.queryByText("Status: Anchored")).not.toBeInTheDocument();
     expect(createVerification).toHaveBeenCalledWith({
       evidenceId,
@@ -237,7 +256,7 @@ describe("verification page", () => {
     await readyToReview();
     await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
     await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
-    expect(await screen.findByText("Status: CONFIRMED")).toBeInTheDocument();
+    expect(await screen.findByText("Status: Confirmed")).toBeInTheDocument();
     expect(screen.getByText("VERIFICATION")).toBeInTheDocument();
     expect(screen.getByText("0xabc")).toBeInTheDocument();
     expect(screen.getAllByText("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").length).toBeGreaterThan(0);
@@ -256,10 +275,10 @@ describe("verification page", () => {
     await readyToReview();
     await user.click(screen.getByRole("button", { name: "Compare stored fingerprint" }));
     await user.click(screen.getByRole("button", { name: "Confirm stored comparison" }));
-    expect(await screen.findByText("Status: PENDING")).toBeInTheDocument();
+    expect(await screen.findByText("Status: Pending")).toBeInTheDocument();
     expect(screen.getAllByText(txLabel).length).toBeGreaterThan(0);
     expect(screen.getByText(blockLabel)).toBeInTheDocument();
-    expect(screen.queryByText("Status: CONFIRMED")).not.toBeInTheDocument();
+    expect(screen.queryByText("Status: Confirmed")).not.toBeInTheDocument();
   });
 
   it("renders persisted verification history with project, milestone, version, and confirmed proof context", async () => {
@@ -379,7 +398,19 @@ describe("verification page", () => {
       role: "CONTRACTOR",
     });
     renderApp("/verification");
-    expect(await screen.findByRole("heading", { name: "You do not have access" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(createVerification).not.toHaveBeenCalled();
+  });
+
+  it("keeps consultant engineers outside verification until project membership exists", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "consultant-1",
+      email: "consultant@example.com",
+      fullName: "Consultant Engineer",
+      role: "CONSULTANT_ENGINEER",
+    });
+    renderApp("/verification");
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(createVerification).not.toHaveBeenCalled();
   });
 

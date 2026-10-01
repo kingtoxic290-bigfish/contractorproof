@@ -4,7 +4,71 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 10 — End-to-End Integration & Demo Validation
+TASK 12 — MVP Role-Based UI and Workflow Alignment
+
+## STATUS
+
+COMPLETE
+
+The frontend role surface now matches the reachable existing API permissions. CLIENT sees project management and assignment but not technical verification. CONTRACTOR sees assigned-work navigation and no project creation, assignment, or technical verification actions. AUDITOR and PROCUREMENT_OFFICER can reach the authorized verification workflow. ADMIN retains the existing project and reviewer surfaces. Public users remain in the separate public verification layout.
+
+Public registration offers only CLIENT and CONTRACTOR. CONSULTANT_ENGINEER remains restricted from verification navigation and routes because the backend role gate alone is insufficient: existing project ownership checks provide no consultant project-membership scope. No backend ownership checks were weakened.
+
+The project workflow uses the existing API: CLIENT creates a project with a selected contractor; the server derives client ownership from the authenticated user; the owning client can later reassign through `PATCH /api/v1/projects/:projectId/contractor`. Contractors read only projects assigned to their account through `GET /api/v1/projects`, and project/milestone/evidence/passport access continues to use the existing ownership checks. Client pages no longer advertise evidence upload or verification routes that the backend does not authorize.
+
+Disputes, corrections, variations, audit, and settings remain incomplete or placeholder routes and are omitted from primary navigation. No full workflow was added for them. This task does not represent CRB/NeST lookup data as live external verification. No schema, external integration, public passport, new role, or blockchain functionality was added for this task.
+
+TESTS:
+
+* Focused frontend role/workflow tests — 4 files, 57/57 tests PASS.
+* Full frontend suite — 31 files, 248/248 tests PASS.
+* Frontend ESLint and TypeScript/production build — PASS.
+* Backend suite on the latest shared worktree — 37/38 files passed; 264/265 tests passed. `test/evidence-version.repository.test.ts` still expects `crbSource` to be `SYNTHETIC_DEMO`, but the current schema returned `null` before a CRB check.
+* Backend TypeScript build — BLOCKED by `backend/src/services/contractor.service.ts:27`: nullable `crbSource` is assigned to the non-null `PublicContractor.crbSource` type. This mismatch is outside the role-visibility edits and was not changed.
+* Prisma schema validation — PASS.
+
+KNOWN LIMITATIONS:
+
+* CONSULTANT_ENGINEER still has no project membership/oversight relationship and therefore cannot use the nominal backend verification/attestation grants against projects. The frontend keeps this role restricted rather than bypassing backend scope.
+* Attestation is available only through the internal verification screen where the current route and project policy permit it; there is no distinct client review decision workflow.
+* Dispute, correction, variation, audit, and settings routes remain placeholders or unavailable. Evidence version append is not exposed by an HTTP route.
+* Public verification is supported; public passports are not.
+* This task does not validate CRB/NeST adapter selection or claim live external verification.
+
+---
+
+## TASK 11 — Role-Based UX and Project Assignment
+
+The project workflow now follows CLIENT creates and assigns, CONTRACTOR works on assigned projects, and ADMIN manages projects across the system. `Project.clientId` records the authenticated owning CLIENT while the existing required `contractorId` remains the current assignee. Existing project rows are preserved with nullable `clientId`; existing contractor assignments are not rewritten.
+
+Backend authorization is authoritative:
+
+* `POST /api/v1/projects` permits CLIENT and ADMIN; CONTRACTOR receives 403. CLIENT ownership is derived from the JWT user ID, and the selected contractor ID is validated against a stored Contractor record. Client-supplied `clientId` is ignored.
+* `PATCH /api/v1/projects/:projectId/contractor` permits only the owning CLIENT or ADMIN. It validates the selected contractor and returns the updated project. Assignment changes project access: the replacement contractor gains access and the former contractor loses access.
+* `POST /api/v1/projects/:projectId/milestones` and `POST /api/v1/milestones` permit the owning CLIENT or ADMIN, not CONTRACTOR.
+* Project, Passport, evidence, attestation, dispute, correction, variation, and proof list/detail reads are scoped to the CLIENT owner or currently assigned CONTRACTOR; existing privileged roles retain their intended oversight access.
+* EVIDENCE_UPLOAD remains available to CONTRACTOR and ADMIN subject to project access. Verification remains restricted to authorized reviewer roles; contractors cannot self-verify.
+
+The frontend has role-aware navigation and dashboards. CONTRACTOR sees assigned-work messaging and no project-create or milestone-management controls. CLIENT/ADMIN see project creation and assignment management; the project creation form requires an existing contractor selection. Project detail labels the client and assigned contractor.
+
+TESTS:
+
+* Backend full suite — 37/37 files, 254/254 tests PASS with `--maxWorkers=2 --minWorkers=1`.
+* Backend TypeScript build and Prisma validation — PASS.
+* Frontend full suite — 31/31 files, 242/242 tests PASS; lint and production build PASS.
+* Hardhat registry tests — 6/6 PASS.
+* Database migration `20260929180000_client_project_ownership` — applied; Prisma reports schema up to date.
+
+KNOWN LIMITATIONS:
+
+* Legacy projects have `clientId = null` after migration; they remain accessible through their existing contractor assignment and privileged oversight access, but are not visible to any CLIENT until a supported ownership/transfer operation assigns them.
+* Assignment currently replaces the project’s current contractor; the schema has no assignment-history table, so prior assignees are not represented as a separate relationship. Evidence and project event history remain in the project record, but the former assignee loses current project access.
+* Project fields other than contractor assignment and milestone creation have no client edit endpoint. There are also no project deletion or milestone edit/delete APIs.
+* Admin user/client management and a separate blockchain-proof listing route are not implemented, so navigation only exposes existing routes/actions.
+
+---
+
+## TASK 10 — End-to-End Integration & Demo Validation
 
 ## STATUS
 
@@ -704,173 +768,3 @@ KNOWN LIMITATIONS:
 
 * Passport lists are not paginated.
 * Passport is a database snapshot; it does not query EVM state or independently revalidate transactions.
-
----
-
-## TASK 12 — Final Presentation Polish & Demo Readiness
-
-STATUS: COMPLETE WITH LIMITATIONS
-
-SCOPE:
-
-* Frontend presentation and demo readiness only. No backend file, API contract, database
-  model, authorization rule, RBAC decision, verification semantic or blockchain semantic was
-  changed. No blockchain transaction was executed.
-
-PRESENTATION WORK:
-
-* Unified state presentation. `MATCH`, `MISMATCH`, `PENDING` and `UNAVAILABLE` now resolve to
-  one tone, one icon and one factual meaning from a single module. `StatusBadge` and
-  `VerificationStatus` previously disagreed on colour for the same four states; that split is
-  resolved. State names are unchanged.
-* Unified card, button, table, loading, empty and error primitives so radius, padding, heading
-  level, control height and message wording are consistent across the product.
-* Added route-derived breadcrumbs and a record-chain indicator (CONTRACTOR → PROJECT →
-  MILESTONE → EVIDENCE → VERIFICATION → PASSPORT). Both are derived from the URL only, so they
-  cannot display a record that was not opened and make no client-side authorization decision.
-* Evidence is presented as an auditable record: identity, content type and size, timestamps, the
-  SHA-256 fingerprint with a statement of what a hash does and does not prove, and the current
-  version explicitly marked as current. Workflow state and fingerprint-comparison state are
-  labelled separately. No filesystem path or storage detail is exposed.
-* Public verification gained a page heading, a visible four-step workflow, per-field validation
-  and focus management. It remains unauthenticated and displays a result only when one is
-  returned by the service.
-* Blockchain proof is presented as an integrity layer. Confirmed proof shows only the
-  transaction hash and block number returned by the API; an unconfirmed response says so plainly.
-  No explorer URL, hash or block number is ever constructed client-side.
-* Unknown routes now render a "Page not found" screen for both the public and authenticated route
-  trees, replacing a silent redirect to the dashboard.
-
-PRESERVED:
-
-* Verification states, names and factual meanings.
-* Backend-authoritative authorization; 403 continues to refuse without signing the user out.
-* Public verification remains unauthenticated.
-* No trust, reputation, risk, reliability or ranking score; no "trusted/safe contractor" claim.
-* No fixture or fake data added; empty states state truthfully that the service returned no
-  records.
-
-TESTS:
-
-* Frontend lint — passed.
-* Frontend tests — 31 files, 242 tests passed.
-* Frontend build — passed (TypeScript + Vite).
-* Backend tests — 37 files, 254 tests passed (unchanged; no backend file edited).
-* Hardhat — 6 passing.
-
-BROWSER VALIDATION:
-
-* Headless Chrome against a Vite dev server, DOM inspected for `/login`, `/verify` and an
-  unknown route: one `h1` per page, labelled form controls, the 404 screen renders, and no
-  horizontal overflow at 360, 390, 768 or 1280 CSS pixels.
-* NOT PERFORMED: live visual inspection of rendered screenshots (this environment cannot
-  perceive images), and authenticated screens in a real browser (the backend, database and seed
-  data were not started). No live blockchain transaction was executed.
-
-KNOWN LIMITATIONS:
-
-* The evidence DTO exposes only `currentVersion`; version history remains visible only through
-  the passport projection.
-* Some passport and variation records still render raw backend timestamps; those files were
-  outside this task's commit scope because they already contained unrelated uncommitted work.
-
----
-
-## PHASE 2 — END-TO-END PRODUCT LIFECYCLE & ACCEPTANCE VALIDATION
-
-STATUS: PASS WITH ONE KNOWN GAP (documented below)
-
-SCOPE:
-
-* Validation only. No production behaviour, API contract, database model, authorization rule,
-  verification semantic or blockchain semantic was changed. No CRB/NIDA/NeST work was introduced.
-  The only production-tree edits in this phase were to test infrastructure and documentation.
-
-ACCEPTANCE SCENARIO ADDED:
-
-* `backend/test/qa/e2e.lifecycle.acceptance.test.ts` runs the complete lifecycle over HTTP against a
-  real local Hardhat chain. It uses the published Hardhat dev account #0 through the existing
-  `setProofBlockchainWriterFactory` seam pointed at a genuine `BlockchainService` — the proof writer
-  is NOT mocked.
-* Scenario: CLIENT creates "Morogoro Municipal Office Renovation", creates three milestones
-  (Site Preparation, Foundation Works, Structural Works), assigns CONTRACTOR A. CONTRACTOR B was the
-  originally-bound contractor and is reassigned away, so B's continued denial is a real IDOR
-  assertion rather than a stranger check.
-* Evidence payloads are fixed byte strings, so every SHA-256 in the scenario is deterministic.
-* 11 sequential steps: project/milestone creation and authorization, assignment, contractor scoping,
-  IDOR denial, evidence submission and hashing, technical verification (MATCH and MISMATCH),
-  client human review (correction + dispute), authorized attestation and role denial, live
-  blockchain confirmation, passport history, public verification, tampering detection, and a role
-  matrix.
-
-TEST INFRASTRUCTURE CHANGE:
-
-* `backend/test/qa/hardhat.ts` — `ensureLocalHardhat`, `stopQaHardhat`,
-  `deployContractorProofRegistry` and the reachability probe are now port-parameterised (defaulting
-  to the previous 8545 behaviour). This lets the acceptance file own a dedicated node on 8546.
-  Without it the new file would have raced nonces against `e2e.blockchain.live.test.ts`, since every
-  live transaction is sent from Hardhat account #0 and Vitest runs files in parallel.
-
-LIFECYCLE RESULTS: all 11 steps PASS, including against the live chain.
-
-VERIFIED, WITH EVIDENCE:
-
-* Evidence files are stored on the local filesystem behind an opaque storage key; only the 64-char
-  SHA-256 digest is ever anchored. The scenario asserts that no file byte string appears in any
-  blockchain event row.
-* Technical verification is system-computed only. CLIENT, CONTRACTOR A and CONTRACTOR B are all
-  refused (403) at POST /api/v1/verification, and a forged `status` field cannot change a result.
-  Verification rows are append-only: MATCH and MISMATCH both persist for the same evidence version.
-* Human review (correction/dispute) records are created by the client but never mutate the
-  cryptographic verification history; the original version, hash and verification rows are preserved.
-* CONTRACTOR is refused attestation (403), unauthenticated is refused (401), and an attestation does
-  not alter the technical result.
-* Live chain proof is confirmed with a real txHash and blockNumber > 0 for both VERIFICATION and
-  ATTESTATION events, associated to the correct project.
-* Passport exposes versions, both verification results, attestations, corrections and proofs, and
-  contains no score of any kind.
-* Public verification is unauthenticated, returns MATCH only against a confirmed on-chain anchor,
-  returns MISMATCH for a tampered payload, UNAVAILABLE for an unknown reference, and leaks no
-  internal fields.
-* A forged 403 does not invalidate the session: the denied contractor remains authenticated
-  afterwards.
-
-KNOWN GAP (the one incomplete item in the target lifecycle):
-
-* Human review is fully implemented and exercised on the server, but it is NOT reachable through the
-  user interface. The frontend routes `/disputes` and `/corrections` still render `PlaceholderPage`,
-  so a client who selects "Request correction" or "Raise dispute" lands on a page stating the module
-  is not available. The nav items are also advertised to CLIENT/CONTRACTOR. This is a UI gap, not an
-  authorization or data gap; closing it is new feature work and was deliberately not started here.
-
-DISCREPANCY FOUND IN PHASE 1 REPORTING (code is the source of truth):
-
-* Phase 1 reported "ATTEST is restricted to ADMIN / CONSULTANT_ENGINEER / PROCUREMENT_OFFICER".
-  The code actually allows `ATTEST_ROLES = CONSULTANT_ENGINEER, CLIENT, PROCUREMENT_OFFICER, AUDITOR,
-  ADMIN`, further narrowed per-milestone by a verification policy's `allowedRoles`. CONTRACTOR is
-  definitively excluded and a user can never attest evidence they uploaded or evidence they own as
-  contractor. The existing `attestation-authz.test.ts` asserts AUDITOR attestation is allowed, so the
-  implemented contract is intentional. No change was made.
-
-TESTS:
-
-* Backend: 38 files, 265 tests passed (254 pre-existing + 11 new acceptance steps).
-* Backend typecheck: clean. Frontend lint: clean. Frontend: 31 files / 242 tests passed, build passed.
-* Contracts: 6 Hardhat tests passing.
-* Flakiness: eight full backend runs were executed. Six passed cleanly. Two showed transient,
-  timeout-shaped failures in unrelated files (once 12 failures, once a single golden-lifecycle
-  failure) caused by shared-PostgreSQL contention under parallel test execution. No assertion was
-  weakened and no production behaviour was altered to accommodate them.
-
-FILES CHANGED IN THIS PHASE:
-
-* backend/test/qa/e2e.lifecycle.acceptance.test.ts (new)
-* backend/test/qa/hardhat.ts (port-parameterised test helper)
-* docs/PROJECT_STATUS.md (this section)
-
-PHASE 3 READINESS:
-
-* The backend lifecycle, authorization, IDOR protection, immutability and public verification are
-  proven by executable integration tests, so Phase 3 (CRB integration) is safe to begin from a
-  backend standpoint. Resolve the `/disputes` and `/corrections` UI placeholder first if the Phase 3
-  demonstration is expected to include human review through the browser.

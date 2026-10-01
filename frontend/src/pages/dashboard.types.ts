@@ -37,6 +37,7 @@ export type DashboardVersion = {
 export type DashboardEvidence = {
   id: string;
   milestoneId: string;
+  status: string;
   createdAt: string;
   versions: DashboardVersion[];
   attestations: DashboardAttestation[];
@@ -145,11 +146,12 @@ function parseEvidence(value: unknown): DashboardEvidence | null {
   if (!isRecord(value)) return null;
   const id = requiredString(value.id);
   const milestoneId = requiredString(value.milestoneId);
+  const status = requiredString(value.status);
   const createdAt = requiredString(value.createdAt);
   const versions = parseList(value.versions, parseVersion);
   const attestations = parseList(value.attestations, parseAttestation);
-  if (!id || !milestoneId || !createdAt || !versions || !attestations) return null;
-  return { id, milestoneId, createdAt, versions, attestations };
+  if (!id || !milestoneId || !status || !createdAt || !versions || !attestations) return null;
+  return { id, milestoneId, status, createdAt, versions, attestations };
 }
 
 function parseMilestone(value: unknown): DashboardMilestone | null {

@@ -19,8 +19,8 @@ export function MilestoneDetailPage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Milestone"
-        description="Milestone details are loaded from the existing authenticated milestone endpoint."
+        title={milestone.data?.name ?? "Milestone"}
+        description="Milestone detail, including associated evidence records for this milestone."
       />
       <p>
         <Link
@@ -37,7 +37,7 @@ export function MilestoneDetailPage() {
         loadingMessage="Loading milestone information..."
       >
         {milestone.data ? (
-          <Card title={milestone.data.name}>
+          <Card title="Milestone record">
             <RecordFields record={milestone.data} />
             <Link
               to={`/evidence?milestoneId=${encodeURIComponent(milestone.data.id)}`}
@@ -57,7 +57,7 @@ export function MilestoneDetailPage() {
             onRetry={() => void evidence.retry()}
             loadingMessage="Loading milestone evidence..."
             emptyTitle="No evidence uploaded yet."
-            emptyDescription="The API returned no evidence records for this milestone."
+            emptyDescription="No evidence records were found for this milestone."
           >
             <EvidenceList records={evidence.records} />
           </QueryPanel>

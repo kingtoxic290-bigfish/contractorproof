@@ -1,59 +1,52 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
-  ClipboardCheck,
+  FilePlus2,
   FileCheck,
   FilePenLine,
   Flag,
   FolderKanban,
-  GitBranch,
+  Gavel,
   LayoutDashboard,
-  Scale,
-  Settings2,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import type { Role } from "../../types/roles";
+import { CORRECTION_PAGE_ROLES } from "../../features/corrections/types";
+import { DISPUTE_PAGE_ROLES } from "../../features/disputes/types";
 
 export type NavItem = {
   to: string;
   label: string;
   hint: string;
-  roles?: Role[];
+  roles?: readonly Role[];
   icon: LucideIcon;
 };
 
 export const APP_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", hint: "Workspace overview", icon: LayoutDashboard },
-  { to: "/contractors", label: "Contractors", hint: "Registered contractor records", icon: Users },
-  { to: "/projects", label: "Projects", hint: "Project and milestone references", icon: Building2 },
-  { to: "/milestones", label: "Milestones", hint: "Project milestone records", icon: Flag },
-  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and hashes", icon: FileCheck },
+  { to: "/contractors", label: "Contractors", hint: "Eligible contractor records", roles: ["CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Users },
+  { to: "/projects", label: "Projects", hint: "Project records", roles: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Building2 },
+  { to: "/projects/new", label: "Create Project", hint: "Create and assign a project", roles: ["CLIENT", "ADMIN"], icon: FilePlus2 },
+  { to: "/milestones", label: "Milestones", hint: "Assigned project milestones", roles: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Flag },
+  { to: "/evidence", label: "Evidence", hint: "Uploaded evidence and hashes", roles: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: FileCheck },
   {
     to: "/verification",
     label: "Verification",
     hint: "Evidence comparison and policy outcomes",
-    roles: ["CONSULTANT_ENGINEER", "CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
+    roles: ["CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
     icon: ShieldCheck,
   },
-  { to: "/passports", label: "Passport", hint: "Project evidence history", icon: FolderKanban },
-  { to: "/disputes", label: "Disputes", hint: "Open and resolved disputes", icon: Scale },
-  { to: "/corrections", label: "Corrections", hint: "Append-only correction events", icon: FilePenLine },
-  { to: "/variations", label: "Variations", hint: "Linked contract variations", icon: GitBranch },
-  {
-    to: "/audit",
-    label: "Audit trail",
-    hint: "System and event audit records",
-    roles: ["AUDITOR", "ADMIN", "PROCUREMENT_OFFICER"],
-    icon: ClipboardCheck,
-  },
-  { to: "/settings", label: "Settings", hint: "Account and workspace settings", icon: Settings2 },
+  { to: "/passports", label: "Passports", hint: "Project evidence history", roles: ["CLIENT", "CONTRACTOR", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: FolderKanban },
+  { to: "/corrections", label: "Corrections", hint: "Human review corrections", roles: CORRECTION_PAGE_ROLES, icon: FilePenLine },
+  { to: "/disputes", label: "Disputes", hint: "Raised disagreements", roles: DISPUTE_PAGE_ROLES, icon: Gavel },
 ];
 
 export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/contractors": "Contractors",
   "/projects": "Projects",
+  "/projects/new": "Create Project",
   "/milestones": "Milestones",
   "/evidence": "Evidence",
   "/verification": "Verification",
@@ -70,7 +63,15 @@ export function visibleNavItems(role: Role | undefined): NavItem[] {
   if (!role) {
     return [];
   }
-  return APP_NAV.filter((item) => !item.roles || item.roles.includes(role));
+  return APP_NAV.filter((item) => item.roles?.includes(role)).map((item) => {
+    if (item.to === "/projects" && role === "CONTRACTOR") {
+      return { ...item, label: "My Projects", hint: "Projects assigned to you" };
+    }
+    if (item.to === "/passports" && role === "CONTRACTOR") {
+      return { ...item, label: "My Passport", hint: "Your assigned project records" };
+    }
+    return item;
+  });
 }
 
 export function pageTitle(pathname: string): string {

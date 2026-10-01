@@ -44,8 +44,7 @@ function AttestationResult({ result }: { result: PublicAttestation }) {
         ) : null}
       </dl>
       <p className="mt-3 text-sm text-stone-600">
-        {result.decision} is the attestation decision. It is not MATCH, MISMATCH, or a blockchain
-        confirmation, and it does not rewrite the evidence workflow status in this API.
+        {result.decision} is the attestation decision. It is separate from the fingerprint comparison result and does not directly update the evidence workflow status.
       </p>
     </div>
   );
@@ -68,7 +67,7 @@ export function AttestationForm({
     return (
       <Card
         title="Attest evidence"
-        description="CONTRACTOR accounts cannot attest evidence, including their own uploads. The API remains authoritative."
+        description="CONTRACTOR accounts cannot record attestations, including for their own uploads."
       >
         <p className="text-sm text-stone-600">Attestation is not available for this role.</p>
       </Card>
@@ -92,7 +91,7 @@ export function AttestationForm({
   return (
     <Card
       title="Attest evidence"
-      description="POST /api/v1/attestations records APPROVED or REJECTED. Authorized readers may also call GET /api/v1/attestations; this task intentionally does not fabricate prior attestations in the current form."
+      description="Record an attestation decision for this evidence. An attestation is an authorized reviewer's decision — it is separate from the fingerprint comparison result."
     >
       <form
         className="space-y-4"
@@ -112,9 +111,8 @@ export function AttestationForm({
 
         {user ? (
           <p className="text-sm text-stone-700">
-            Attestor session: {user.fullName} · {user.role}. Client-supplied verifier identity is
-            ignored by the API.
-          </p>
+          Recording as: {user.fullName} · {user.role}
+        </p>
         ) : null}
 
         <label className="block text-sm">

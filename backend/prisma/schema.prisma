@@ -88,20 +88,23 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  contractor               Contractor?
-  uploadedEvidence         Evidence[]           @relation("EvidenceUploader")
-  createdEvidenceVersions  EvidenceVersion[]    @relation("EvidenceVersionCreator")
-  attestations             Attestation[]
-  disputes                 Dispute[]
-  corrections              Correction[]
-  variations               ContractVariation[]
-  auditLogs                AuditLog[]
-  blockchainEvents         BlockchainEvent[]    @relation("BlockchainEventActor")
-  verifications            Verification[]
-  disputeResolutions       DisputeResolution[]  @relation("DisputeResolutionActor")
-  correctionResolutions    CorrectionResolution[] @relation("CorrectionResolutionActor")
-  variationResolutions     VariationResolution[]  @relation("VariationResolutionActor")
-  variationReviews         ContractVariation[]    @relation("VariationReviewer")
+  contractor              Contractor?
+  ownedProjects           Project[]              @relation("ProjectClient")
+  uploadedEvidence        Evidence[]             @relation("EvidenceUploader")
+  createdEvidenceVersions EvidenceVersion[]      @relation("EvidenceVersionCreator")
+  attestations            Attestation[]
+  disputes                Dispute[]
+  corrections             Correction[]
+  variations              ContractVariation[]
+  auditLogs               AuditLog[]
+  blockchainEvents        BlockchainEvent[]      @relation("BlockchainEventActor")
+  verifications           Verification[]
+  disputeResolutions      DisputeResolution[]    @relation("DisputeResolutionActor")
+  correctionResolutions   CorrectionResolution[] @relation("CorrectionResolutionActor")
+  variationResolutions    VariationResolution[]  @relation("VariationResolutionActor")
+  variationReviews        ContractVariation[]    @relation("VariationReviewer")
+  crbVerificationRequests CrbVerification[]      @relation("CrbVerificationRequester")
+  procurementLinksCreated ProcurementLink[] @relation("ProcurementLinkActor")
 }
 
 model Contractor {
@@ -115,17 +118,145 @@ model Contractor {
   crbClass              String?
   crbStatus             String?
   crbLastVerifiedAt     DateTime?
-  crbSource             String    @default("SYNTHETIC_DEMO")
+  /// Source of the latest CRB check. Null until a check has actually been
+  /// performed; a source is never asserted speculatively.
+  crbSource             String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   projects Project[]
 
+  /// Append-only regulatory checks. History is never overwritten.
+  crbVerifications CrbVerification[]
+  procurementLinks ProcurementLink[]
+
   @@index([crbRegistrationNumber])
 }
 
+/// Factual outcome of one CRB registration check. These are states of the
+/// external source, not judgements about the contractor.
+enum CrbVerificationStatus {
+  REGISTERED
+  NOT_REGISTERED
+  EXPIRED
+  SUSPENDED
+  PENDING
+  UNAVAILABLE
+  INVALID_REFERENCE
+}
+
+/// Which CRB adapter produced a check.
+enum CrbVerificationSource {
+  /// Deterministic local adapter for development and demonstration.
+  SANDBOX
+  /// Official CRB connector. Requires authorized CRB integration access.
+  CRB_OFFICIAL
+}
+
+model CrbVerification {
+  id                    String                @id @default(uuid())
+  contractorId          String
+  contractor            Contractor            @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  /// Reference sent to CRB for this check, as supplied by the ContractorProof record.
+  registrationReference String
+  status                CrbVerificationStatus
+  source                CrbVerificationSource
+  /// Registration number exactly as CRB returned it, when returned.
+  registrationNumber    String?
+  registeredName        String?
+  category              String?
+  registrationClass     String?
+  registrationDate      DateTime?
+  expiryDate            DateTime?
+  /// Opaque reference issued by CRB for this response, when supplied.
+  externalReference     String?
+  /// When the check was performed against the external source.
+  checkedAt             DateTime              @default(now())
+  /// SHA-256 over the canonical normalized record. Proves record integrity and
+  /// makes any later alteration detectable. The raw external response is never
+  /// stored, and never written to the blockchain.
+  canonicalDigest       String
+  /// Stable machine-readable failure code when status is UNAVAILABLE.
+  failureCode           String?
+  requestedById         String?
+  requestedBy           User?                 @relation("CrbVerificationRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt             DateTime              @default(now())
+
+  @@index([contractorId, checkedAt])
+  @@index([contractorId, status])
+  @@index([requestedById])
+}
+
+enum ProcurementSourceSystem {
+  SANDBOX_DEMO
+  NEST_OCDS_PUBLIC
+}
+
+model ProcurementRecord {
+  id                String                 @id @default(uuid())
+  sourceSystem      ProcurementSourceSystem
+  externalReference String
+  sourceRecordId    String?
+  sourceUrl         String
+  createdAt         DateTime               @default(now())
+
+  observations ProcurementObservation[]
+  links        ProcurementLink[]
+
+  @@unique([sourceSystem, externalReference])
+  @@index([sourceRecordId])
+}
+
+model ProcurementObservation {
+  id                   String           @id @default(uuid())
+  procurementRecordId  String
+  procurementRecord    ProcurementRecord @relation(fields: [procurementRecordId], references: [id], onDelete: Restrict)
+  ocid                 String
+  releaseId            String
+  releaseDate          DateTime?
+  tenderReference      String?
+  title                String?
+  description          String?
+  buyerName            String?
+  buyerIdentifier      String?
+  procurementCategory  String?
+  tenderStatus         String?
+  awardStatus          String?
+  awardDate            DateTime?
+  contractReference    String?
+  contractStatus       String?
+  contractorName       String?
+  contractorIdentifier String?
+  contractValue        Decimal?         @db.Decimal(20, 4)
+  contractCurrency     String?
+  contractStartDate    DateTime?
+  contractEndDate      DateTime?
+  normalizedData       Json
+  sourceDigest         String
+  retrievedAt          DateTime         @default(now())
+
+  @@index([procurementRecordId, retrievedAt])
+  @@index([ocid, releaseId])
+}
+
+model ProcurementLink {
+  id                 String           @id @default(uuid())
+  contractorId       String
+  contractor         Contractor       @relation(fields: [contractorId], references: [id], onDelete: Restrict)
+  procurementRecordId String
+  procurementRecord  ProcurementRecord @relation(fields: [procurementRecordId], references: [id], onDelete: Restrict)
+  linkedById         String
+  linkedBy           User             @relation("ProcurementLinkActor", fields: [linkedById], references: [id], onDelete: Restrict)
+  linkedAt           DateTime         @default(now())
+
+  @@unique([contractorId, procurementRecordId])
+  @@index([procurementRecordId])
+}
+
 model Project {
-  id                    String    @id @default(uuid())
+  id                    String     @id @default(uuid())
+  clientId              String?
+  client                User?      @relation("ProjectClient", fields: [clientId], references: [id], onDelete: Restrict)
   contractorId          String
   contractor            Contractor @relation(fields: [contractorId], references: [id], onDelete: Restrict)
   name                  String
@@ -137,9 +268,9 @@ model Project {
   contractStatus        String?
   contractStartDate     DateTime?
   contractEndDate       DateTime?
-  nestSource            String    @default("SYNTHETIC_DEMO")
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  nestSource            String     @default("SYNTHETIC_DEMO")
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
 
   milestones           Milestone[]
   verificationPolicies VerificationPolicy[]
@@ -147,6 +278,7 @@ model Project {
   blockchainEvents     BlockchainEvent[]
 
   @@index([contractorId])
+  @@index([clientId])
   @@index([nestContractReference])
   @@index([ocid])
 }
@@ -169,16 +301,16 @@ model VerificationPolicy {
 }
 
 model Milestone {
-  id          String          @id @default(uuid())
+  id          String              @id @default(uuid())
   projectId   String
-  project     Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  project     Project             @relation(fields: [projectId], references: [id], onDelete: Restrict)
   policyId    String?
   policy      VerificationPolicy? @relation(fields: [policyId], references: [id], onDelete: SetNull)
   name        String
   description String?
-  status      MilestoneStatus @default(PENDING)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  status      MilestoneStatus     @default(PENDING)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
   evidence     Evidence[]
   attestations Attestation[]
@@ -191,11 +323,11 @@ model Milestone {
 }
 
 model Evidence {
-  id               String         @id @default(uuid())
+  id               String           @id @default(uuid())
   milestoneId      String
-  milestone        Milestone      @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  milestone        Milestone        @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
   uploadedById     String
-  uploadedBy       User           @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  uploadedBy       User             @relation("EvidenceUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
   /// Denormalized current version file name. Authority is EvidenceVersion.fileName.
   fileName         String
   /// Denormalized current version storage key. Authority is EvidenceVersion.storageReference.
@@ -206,13 +338,13 @@ model Evidence {
   sizeBytes        Int
   /// Denormalized current version SHA-256. Authority is EvidenceVersion.sha256.
   sha256           String
-  status           EvidenceStatus @default(PENDING_VERIFICATION)
-  currentVersionId String?        @unique
+  status           EvidenceStatus   @default(PENDING_VERIFICATION)
+  currentVersionId String?          @unique
   currentVersion   EvidenceVersion? @relation("EvidenceCurrentVersion", fields: [currentVersionId, id], references: [id, evidenceId], onDelete: Restrict)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  versions     EvidenceVersion[] @relation("EvidenceVersions")
+  versions     EvidenceVersion[]   @relation("EvidenceVersions")
   attestations Attestation[]
   corrections  Correction[]
   variations   ContractVariation[]
@@ -227,9 +359,9 @@ model Evidence {
 
 /// Immutable stored file + SHA-256. Do not update sha256 or storageReference after insert.
 model EvidenceVersion {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   evidenceId       String
-  evidence         Evidence @relation("EvidenceVersions", fields: [evidenceId], references: [id], onDelete: Restrict)
+  evidence         Evidence  @relation("EvidenceVersions", fields: [evidenceId], references: [id], onDelete: Restrict)
   currentFor       Evidence? @relation("EvidenceCurrentVersion")
   versionNumber    Int
   storageReference String
@@ -239,11 +371,11 @@ model EvidenceVersion {
   /// Canonical application SHA-256: lowercase hex, 64 characters.
   sha256           String
   createdById      String?
-  createdBy        User?    @relation("EvidenceVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt        DateTime @default(now())
+  createdBy        User?     @relation("EvidenceVersionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt        DateTime  @default(now())
 
-  verifications Verification[]
-  correctionsAsOriginal Correction[] @relation("CorrectionOriginalVersion")
+  verifications         Verification[]
+  correctionsAsOriginal Correction[]           @relation("CorrectionOriginalVersion")
   correctionResolutions CorrectionResolution[] @relation("CorrectionCorrectedVersion")
 
   @@unique([id, evidenceId])
@@ -256,16 +388,16 @@ model EvidenceVersion {
 
 /// Append-only fingerprint compare. Not EvidenceStatus and not Attestation.
 model Verification {
-  id                  String              @id @default(uuid())
+  id                  String             @id @default(uuid())
   evidenceVersionId   String
-  evidenceVersion     EvidenceVersion     @relation(fields: [evidenceVersionId], references: [id], onDelete: Restrict)
+  evidenceVersion     EvidenceVersion    @relation(fields: [evidenceVersionId], references: [id], onDelete: Restrict)
   status              VerificationStatus
   presentedSha256     String?
   authoritativeSha256 String
   source              VerificationSource
   requestedById       String?
-  requestedBy         User?               @relation(fields: [requestedById], references: [id], onDelete: SetNull)
-  createdAt           DateTime            @default(now())
+  requestedBy         User?              @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime           @default(now())
 
   @@index([evidenceVersionId])
   @@index([status])
@@ -274,17 +406,17 @@ model Verification {
 }
 
 model Attestation {
-  id           String               @id @default(uuid())
+  id           String              @id @default(uuid())
   milestoneId  String
-  milestone    Milestone            @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  milestone    Milestone           @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
   evidenceId   String
-  evidence     Evidence             @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  evidence     Evidence            @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
   verifierId   String
-  verifier     User                 @relation(fields: [verifierId], references: [id], onDelete: Restrict)
+  verifier     User                @relation(fields: [verifierId], references: [id], onDelete: Restrict)
   verifierRole Role
   decision     AttestationDecision
   comment      String?
-  createdAt    DateTime             @default(now())
+  createdAt    DateTime            @default(now())
 
   @@unique([evidenceId, verifierId])
   @@index([milestoneId])
@@ -326,24 +458,24 @@ model BlockchainEvent {
 }
 
 model Dispute {
-  id                      String        @id @default(uuid())
-  milestoneId             String
-  milestone               Milestone     @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
-  evidenceId              String?
-  evidence                Evidence?     @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
-  raisedById              String
-  raisedBy                User          @relation(fields: [raisedById], references: [id], onDelete: Restrict)
-  status                  DisputeStatus @default(OPEN)
-  reason                  String
-  disputeEventId          String?           @unique
-  disputeEvent            BlockchainEvent?  @relation("DisputeProofEvent", fields: [disputeEventId], references: [id], onDelete: Restrict)
-  originalEventId         String?
-  originalEvent           BlockchainEvent? @relation("DisputeOriginalEvent", fields: [originalEventId], references: [id], onDelete: Restrict)
-  resolutionEventId       String?
-  resolutionEvent         BlockchainEvent? @relation("DisputeResolutionEvent", fields: [resolutionEventId], references: [id], onDelete: Restrict)
-  resolutions             DisputeResolution[]
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  id                String              @id @default(uuid())
+  milestoneId       String
+  milestone         Milestone           @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  evidenceId        String?
+  evidence          Evidence?           @relation(fields: [evidenceId], references: [id], onDelete: Restrict)
+  raisedById        String
+  raisedBy          User                @relation(fields: [raisedById], references: [id], onDelete: Restrict)
+  status            DisputeStatus       @default(OPEN)
+  reason            String
+  disputeEventId    String?             @unique
+  disputeEvent      BlockchainEvent?    @relation("DisputeProofEvent", fields: [disputeEventId], references: [id], onDelete: Restrict)
+  originalEventId   String?
+  originalEvent     BlockchainEvent?    @relation("DisputeOriginalEvent", fields: [originalEventId], references: [id], onDelete: Restrict)
+  resolutionEventId String?
+  resolutionEvent   BlockchainEvent?    @relation("DisputeResolutionEvent", fields: [resolutionEventId], references: [id], onDelete: Restrict)
+  resolutions       DisputeResolution[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 
   @@index([milestoneId])
   @@index([raisedById])
@@ -352,37 +484,37 @@ model Dispute {
 }
 
 model DisputeResolution {
-  id           String       @id @default(uuid())
-  disputeId    String       @unique
-  dispute      Dispute      @relation(fields: [disputeId], references: [id], onDelete: Restrict)
+  id           String        @id @default(uuid())
+  disputeId    String        @unique
+  dispute      Dispute       @relation(fields: [disputeId], references: [id], onDelete: Restrict)
   status       DisputeStatus
   resolution   String
   resolvedById String
-  resolvedBy   User         @relation("DisputeResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
-  createdAt    DateTime     @default(now())
+  resolvedBy   User          @relation("DisputeResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime      @default(now())
 
   @@index([resolvedById])
   @@index([createdAt])
 }
 
 model Correction {
-  id                       String                    @id @default(uuid())
-  milestoneId              String
-  milestone                Milestone                 @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
-  originalEventId          String
-  originalEvent            BlockchainEvent           @relation(fields: [originalEventId], references: [id], onDelete: Restrict)
+  id                        String                 @id @default(uuid())
+  milestoneId               String
+  milestone                 Milestone              @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  originalEventId           String
+  originalEvent             BlockchainEvent        @relation(fields: [originalEventId], references: [id], onDelete: Restrict)
   originalEvidenceVersionId String?
-  originalEvidenceVersion  EvidenceVersion?          @relation("CorrectionOriginalVersion", fields: [originalEvidenceVersionId], references: [id], onDelete: Restrict)
-  reason                   String
-  evidenceId               String?
-  evidence                 Evidence?                 @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
-  actorId                  String
-  actor                    User                      @relation(fields: [actorId], references: [id], onDelete: Restrict)
-  status                   CorrectionStatus          @default(OPEN)
-  correctionEventId        String?                   @unique
-  correctionEvent          BlockchainEvent?          @relation("CorrectionProofEvent", fields: [correctionEventId], references: [id], onDelete: Restrict)
-  resolutions              CorrectionResolution[]
-  createdAt                DateTime                  @default(now())
+  originalEvidenceVersion   EvidenceVersion?       @relation("CorrectionOriginalVersion", fields: [originalEvidenceVersionId], references: [id], onDelete: Restrict)
+  reason                    String
+  evidenceId                String?
+  evidence                  Evidence?              @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  actorId                   String
+  actor                     User                   @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  status                    CorrectionStatus       @default(OPEN)
+  correctionEventId         String?                @unique
+  correctionEvent           BlockchainEvent?       @relation("CorrectionProofEvent", fields: [correctionEventId], references: [id], onDelete: Restrict)
+  resolutions               CorrectionResolution[]
+  createdAt                 DateTime               @default(now())
 
   @@index([milestoneId])
   @@index([originalEventId])
@@ -392,16 +524,16 @@ model Correction {
 }
 
 model CorrectionResolution {
-  id                       String           @id @default(uuid())
-  correctionId             String           @unique
-  correction               Correction       @relation(fields: [correctionId], references: [id], onDelete: Restrict)
-  status                   CorrectionStatus
-  resolution               String
+  id                         String           @id @default(uuid())
+  correctionId               String           @unique
+  correction                 Correction       @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  status                     CorrectionStatus
+  resolution                 String
   correctedEvidenceVersionId String?
-  correctedEvidenceVersion EvidenceVersion? @relation("CorrectionCorrectedVersion", fields: [correctedEvidenceVersionId], references: [id], onDelete: Restrict)
-  resolvedById             String
-  resolvedBy               User             @relation("CorrectionResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
-  createdAt                DateTime         @default(now())
+  correctedEvidenceVersion   EvidenceVersion? @relation("CorrectionCorrectedVersion", fields: [correctedEvidenceVersionId], references: [id], onDelete: Restrict)
+  resolvedById               String
+  resolvedBy                 User             @relation("CorrectionResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt                  DateTime         @default(now())
 
   @@index([correctedEvidenceVersionId])
   @@index([resolvedById])
@@ -409,50 +541,50 @@ model CorrectionResolution {
 }
 
 model ContractVariation {
-  id                 String          @id @default(uuid())
+  id                 String                @id @default(uuid())
   projectId          String
-  project            Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  project            Project               @relation(fields: [projectId], references: [id], onDelete: Restrict)
   previousEventId    String
-  previousEvent      BlockchainEvent @relation("VariationPreviousEvent", fields: [previousEventId], references: [id], onDelete: Restrict)
+  previousEvent      BlockchainEvent       @relation("VariationPreviousEvent", fields: [previousEventId], references: [id], onDelete: Restrict)
   variationReference String
   reason             String
   evidenceId         String?
-  evidence           Evidence?       @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  evidence           Evidence?             @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
   actorId            String
-  actor              User            @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  actor              User                  @relation(fields: [actorId], references: [id], onDelete: Restrict)
   reviewedById       String?
-  reviewedBy         User?            @relation("VariationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedBy         User?                 @relation("VariationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   reviewedAt         DateTime?
-  status             VariationStatus @default(OPEN)
+  status             VariationStatus       @default(OPEN)
   milestoneId        String?
-  milestone          Milestone?      @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
+  milestone          Milestone?            @relation(fields: [milestoneId], references: [id], onDelete: Restrict)
   originalState      Json
   proposedState      Json
-  variationEventId   String?         @unique
-  variationEvent     BlockchainEvent? @relation("VariationProofEvent", fields: [variationEventId], references: [id], onDelete: Restrict)
+  variationEventId   String?               @unique
+  variationEvent     BlockchainEvent?      @relation("VariationProofEvent", fields: [variationEventId], references: [id], onDelete: Restrict)
   resolutions        VariationResolution[]
-  createdAt          DateTime        @default(now())
-  updatedAt          DateTime        @updatedAt
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
+  @@unique([projectId, variationReference])
   @@index([projectId])
   @@index([previousEventId])
   @@index([actorId])
-  @@unique([projectId, variationReference])
   @@index([milestoneId])
   @@index([status])
   @@index([reviewedById])
 }
 
 model VariationResolution {
-  id           String          @id @default(uuid())
-  variationId  String          @unique
+  id           String            @id @default(uuid())
+  variationId  String            @unique
   variation    ContractVariation @relation(fields: [variationId], references: [id], onDelete: Restrict)
   status       VariationStatus
   decision     String
   note         String
   resolvedById String
-  resolvedBy   User            @relation("VariationResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
-  createdAt    DateTime        @default(now())
+  resolvedBy   User              @relation("VariationResolutionActor", fields: [resolvedById], references: [id], onDelete: Restrict)
+  createdAt    DateTime          @default(now())
 
   @@index([resolvedById])
   @@index([createdAt])

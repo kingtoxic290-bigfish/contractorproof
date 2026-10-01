@@ -33,7 +33,7 @@ describe("ForbiddenPage", () => {
   it("blocks a contractor from the audit trail", async () => {
     renderApp("/audit");
 
-    expect(await screen.findByRole("heading", { name: "You do not have access" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
     expect(
       screen.getByText(/this area is not available for your role/i),
     ).toBeInTheDocument();

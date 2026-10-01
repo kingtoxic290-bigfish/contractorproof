@@ -39,6 +39,7 @@ function passport(statuses: string[] = ["MATCH", "MISMATCH", "PENDING", "UNAVAIL
           {
             id: "evidence-1",
             milestoneId: "milestone-1",
+            status: "PENDING_VERIFICATION",
             createdAt,
             versions: [
               {
@@ -102,8 +103,8 @@ describe("verification dashboard", () => {
     renderApp("/dashboard");
 
     expect((await screen.findAllByText("Harbor access road")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Harbor Works Ltd")).toBeInTheDocument();
-    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    expect(screen.getAllByText("Harbor Works Ltd").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("ACTIVE").length).toBeGreaterThan(0);
     expect(screen.getByText("Groundworks")).toBeInTheDocument();
     expect(screen.getAllByText("MATCH").length).toBeGreaterThan(0);
     expect(screen.getAllByText("MISMATCH").length).toBeGreaterThan(0);
@@ -124,9 +125,39 @@ describe("verification dashboard", () => {
     renderApp("/dashboard");
 
     expect(await screen.findByText("No projects available.")).toBeInTheDocument();
-    expect(screen.getByText("The backend returned no projects accessible to this account.")).toBeInTheDocument();
+    expect(screen.getByText("No projects are accessible to this account.")).toBeInTheDocument();
     expect(screen.getAllByText("0", { selector: "p" })).toHaveLength(5);
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("gives contractors an assigned-work empty state and no create action", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "contractor-user",
+      email: "contractor@example.com",
+      fullName: "Demo Contractor",
+      role: "CONTRACTOR",
+    });
+    vi.mocked(loadDashboard).mockResolvedValue([]);
+    renderApp("/dashboard");
+
+    expect(await screen.findByRole("heading", { name: "Contractor Work Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByText("No projects have been assigned to you yet.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Create Project/i })).not.toBeInTheDocument();
+  });
+
+  it("gives clients a project-creation action when they have no projects", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "client-user",
+      email: "client@example.com",
+      fullName: "Demo Client",
+      role: "CLIENT",
+    });
+    vi.mocked(loadDashboard).mockResolvedValue([]);
+    renderApp("/dashboard");
+
+    expect(await screen.findByRole("heading", { name: "Project Management Dashboard" })).toBeInTheDocument();
+    expect(await screen.findByText("No projects yet.")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Create Project/i }).some((link) => link.getAttribute("href") === "/projects/new")).toBe(true);
   });
 
   it("shows an error rather than zero metrics when the API fails", async () => {
@@ -142,7 +173,7 @@ describe("verification dashboard", () => {
     vi.mocked(loadDashboard).mockRejectedValue(new ApiError(403, "insufficient permission"));
     renderApp("/dashboard");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("did not authorize access");
+    expect(await screen.findByRole("alert")).toHaveTextContent("does not have access to dashboard records");
     expect(screen.queryByRole("heading", { name: "Sign in" })).not.toBeInTheDocument();
   });
 

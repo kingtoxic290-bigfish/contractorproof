@@ -54,7 +54,7 @@ export function MilestoneCreatePage() {
     <section className="space-y-6">
       <PageHeader
         title="New milestone"
-        description="Create a milestone for the selected project using the real project-scoped backend endpoint."
+        description="Add a milestone to this project. Milestones define the work stages for which evidence can be submitted."
       />
 
       <div className="flex items-center justify-between gap-3">
@@ -68,7 +68,7 @@ export function MilestoneCreatePage() {
 
       <Card
         title="Create milestone"
-        description="The backend validates required fields and project authorization. The frontend only provides the form and surfaces server errors."
+        description="Provide a name and an optional description. The server validates the required fields and your project access."
       >
         <form className="grid gap-4" onSubmit={onSubmit} noValidate>
           <label className="block text-sm" htmlFor="milestone-name">

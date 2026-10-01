@@ -36,8 +36,11 @@ export function getDashboardSummary(passports: DashboardProjectPassport[]) {
   const proofs = passports.flatMap((passport) => passport.blockchainProofs);
   return {
     projectCount: passports.length,
+    activeProjectCount: passports.filter((passport) => passport.project.contractStatus === "ACTIVE").length,
     milestoneCount: milestones.length,
+    inProgressMilestoneCount: milestones.filter((milestone) => milestone.status === "IN_PROGRESS").length,
     evidenceCount: evidence.length,
+    pendingEvidenceCount: evidence.filter((record) => record.status === "PENDING_VERIFICATION").length,
     verificationCount: verifications.length,
     verificationCounts,
     confirmedProofCount: proofs.filter((proof) => proof.confirmed).length,

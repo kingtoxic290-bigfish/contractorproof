@@ -59,7 +59,7 @@ export function VerificationResult({ result }: { result: PublicVerification }) {
               {result.createdAt ? (
                 <time dateTime={result.createdAt}>{result.createdAt}</time>
               ) : (
-                "Not recorded by the backend"
+                "Not recorded"
               )}
             </dd>
           </div>

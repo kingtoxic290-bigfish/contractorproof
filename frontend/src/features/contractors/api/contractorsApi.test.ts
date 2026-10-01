@@ -31,6 +31,24 @@ describe("contractorsApi envelopes", () => {
     expect(apiRequest).toHaveBeenCalledWith("/contractors");
   });
 
+  it("consumes a real collection containing contractors with a null crbSource", async () => {
+    // The API returns crbSource: null until a CRB check has actually run, so a
+    // single such record must not reject the whole collection.
+    const unchecked = { ...harbor, id: "c3", crbSource: null };
+
+    vi.mocked(apiRequest).mockResolvedValue({ contractors: [harbor, quay, unchecked] });
+
+    await expect(listContractors()).resolves.toEqual([harbor, quay, unchecked]);
+  });
+
+  it("accepts a collection of contractors that have never been CRB checked", async () => {
+    const allUnchecked = [harbor, quay].map((record) => ({ ...record, crbSource: null }));
+
+    vi.mocked(apiRequest).mockResolvedValue({ contractors: allUnchecked });
+
+    await expect(listContractors()).resolves.toEqual(allUnchecked);
+  });
+
   it("unwraps multiple contractor records", async () => {
     vi.mocked(apiRequest).mockResolvedValue({ contractors: [harbor, quay] });
 

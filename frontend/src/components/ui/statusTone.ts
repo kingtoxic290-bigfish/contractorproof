@@ -89,6 +89,44 @@ export function verificationTone(status: string): StatusTone {
   return VERIFICATION_TONES[status] ?? NEUTRAL;
 }
 
+/**
+ * Correction and dispute states. These are the backend's values. They describe
+ * the state of a human review workflow and never the technical verification of
+ * the underlying evidence.
+ */
+export const CORRECTION_TONES: Record<string, StatusTone> = {
+  OPEN: {
+    tone: "border-[#92400e] bg-[#fef3c7] text-[#92400e]",
+    icon: Clock3,
+    meaning: "A correction has been requested and no review decision has been recorded yet.",
+  },
+  UNDER_REVIEW: {
+    tone: "border-stone-500 bg-stone-100 text-stone-700",
+    icon: Clock3,
+    meaning: "An authorized reviewer has started reviewing this correction.",
+  },
+  APPROVED: {
+    tone: "border-[#166534] bg-[#dcfce7] text-[#166534]",
+    icon: CheckCircle2,
+    meaning: "The correction was approved. The original event is unchanged and a new event was appended.",
+  },
+  RESOLVED: {
+    tone: "border-[#166534] bg-[#dcfce7] text-[#166534]",
+    icon: CheckCircle2,
+    meaning: "The dispute was resolved and recorded. Technical verification was not changed.",
+  },
+  REJECTED: {
+    tone: "border-[#991b1b] bg-[#fee2e2] text-[#991b1b]",
+    icon: FileWarning,
+    meaning: "The request was rejected. The original event remains the record of fact.",
+  },
+};
+
+/** Resolves a correction or dispute state to its presentation. */
+export function workflowReviewTone(status: string): StatusTone {
+  return CORRECTION_TONES[status] ?? NEUTRAL;
+}
+
 /** Resolves an evidence workflow state to its presentation, falling back to neutral. */
 export function workflowTone(status: string): StatusTone {
   return WORKFLOW_TONES[status] ?? NEUTRAL;

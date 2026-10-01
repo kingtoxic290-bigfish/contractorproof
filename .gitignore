@@ -43,3 +43,6 @@ contracts/ignition/deployments/
 
 # TypeScript
 *.tsbuildinfo
+
+# Local agent/task archives
+ContractorProof-task*.zip

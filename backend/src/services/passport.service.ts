@@ -45,6 +45,35 @@ function toRelatedProof(event: {
   };
 }
 
+function procurementObservationView(observation: PassportProjectRow["contractor"]["procurementLinks"][number]["procurementRecord"]["observations"][number]) {
+  return {
+    id: observation.id,
+    ocid: observation.ocid,
+    releaseId: observation.releaseId,
+    releaseDate: iso(observation.releaseDate),
+    tenderReference: observation.tenderReference,
+    title: observation.title,
+    description: observation.description,
+    buyerName: observation.buyerName,
+    buyerIdentifier: observation.buyerIdentifier,
+    procurementCategory: observation.procurementCategory,
+    tenderStatus: observation.tenderStatus,
+    awardStatus: observation.awardStatus,
+    awardDate: iso(observation.awardDate),
+    contractReference: observation.contractReference,
+    contractStatus: observation.contractStatus,
+    contractorName: observation.contractorName,
+    contractorIdentifier: observation.contractorIdentifier,
+    contractValue: observation.contractValue?.toString() ?? null,
+    contractCurrency: observation.contractCurrency,
+    contractStartDate: iso(observation.contractStartDate),
+    contractEndDate: iso(observation.contractEndDate),
+    normalizedData: observation.normalizedData,
+    sourceDigest: observation.sourceDigest,
+    retrievedAt: observation.retrievedAt.toISOString(),
+  };
+}
+
 function projectPassport(row: PassportProjectRow) {
   const blockchainProofs = row.blockchainEvents.map(toPassportProof);
   const proofFor = (eventType: BlockchainEventType, referenceId: string) =>
@@ -65,6 +94,14 @@ function projectPassport(row: PassportProjectRow) {
       crbStatus: row.contractor.crbStatus,
       crbLastVerifiedAt: iso(row.contractor.crbLastVerifiedAt),
       crbSource: row.contractor.crbSource,
+      procurementRecords: row.contractor.procurementLinks.map((link) => ({
+        sourceSystem: link.procurementRecord.sourceSystem,
+        externalReference: link.procurementRecord.externalReference,
+        sourceRecordId: link.procurementRecord.sourceRecordId,
+        sourceReference: link.procurementRecord.sourceUrl,
+        linkedAt: link.linkedAt.toISOString(),
+        observations: link.procurementRecord.observations.map(procurementObservationView),
+      })),
     },
     project: {
       id: row.id,

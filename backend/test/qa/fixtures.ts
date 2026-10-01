@@ -211,6 +211,9 @@ export async function cleanupQaUsers(): Promise<void> {
     });
   }
   await prisma.project.deleteMany({ where: { contractor: { userId: { in: ids } } } });
+  // CrbVerification is append-only with ON DELETE RESTRICT, so audit rows must
+  // be removed explicitly before the contractor row.
+  await prisma.crbVerification.deleteMany({ where: { contractor: { userId: { in: ids } } } });
   await prisma.contractor.deleteMany({ where: { userId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
 }

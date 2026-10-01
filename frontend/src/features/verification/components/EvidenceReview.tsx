@@ -45,8 +45,7 @@ export function EvidenceReview({
         </div>
       ) : (
         <p className="text-sm text-stone-600">
-          Select evidence from the list, or provide identifiers. There is no GET /evidence/:id
-          route, so filename and hash appear only when the evidence list includes this record.
+          Select an evidence record from the list above, or provide identifiers directly. Filename and fingerprint will appear when the evidence list includes this record.
         </p>
       )}
 
@@ -89,7 +88,7 @@ export function EvidenceReview({
                 {projectId}
               </Link>
             ) : (
-              "Not provided by this API"
+              "Not provided"
             )}
           </dd>
         </div>
@@ -103,8 +102,9 @@ export function EvidenceReview({
 
       {evidence ? (
         <p className="mt-4 text-sm text-stone-600">
-          Workflow status is {evidence.status}. List fingerprint comparison is{" "}
-          {evidence.verificationStatus}. A listed SHA-256 is not a verification decision.
+          Evidence workflow status: <span className="font-medium">{evidence.status}</span>.
+          Verification state: <span className="font-medium">{evidence.verificationStatus}</span>.
+          The SHA-256 fingerprint shown above is the recorded value; it is not a verification decision.
         </p>
       ) : null}
     </Card>

@@ -103,6 +103,18 @@ describe("contractor passports", () => {
     expect(screen.queryByText(/comment|verifierId/i)).not.toBeInTheDocument();
   });
 
+  it("renders labeled NeST procurement provenance separately from CRB registration", async () => {
+    renderApp("/passports/project-1");
+
+    expect(await screen.findByRole("heading", { name: "PROCUREMENT · NeST" })).toBeInTheDocument();
+    expect(screen.getByText("DEMO / SANDBOX")).toBeInTheDocument();
+    expect(screen.getByText("DEMO: Works package one")).toBeInTheDocument();
+    expect(screen.getByText("DEMO Public Works Unit")).toBeInTheDocument();
+    expect(screen.getByText("Source: SANDBOX_DEMO:ocds-sandbox-001")).toBeInTheDocument();
+    expect(screen.getByText(/Procurement information sourced from NeST/)).toBeInTheDocument();
+    expect(screen.queryByText(/Contractor verified by NeST|trustworthy/i)).not.toBeInTheDocument();
+  });
+
   it("preserves correction, variation snapshots, resolutions, and dated record history", async () => {
     renderApp("/passports/project-1");
     expect(await screen.findByText("Corrections (1)")).toBeInTheDocument();

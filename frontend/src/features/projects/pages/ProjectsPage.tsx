@@ -9,13 +9,38 @@ import { useProjects } from "../hooks/useProjects";
 export function ProjectsPage() {
   const { status, records, error, retry } = useProjects();
   const { hasRole } = useAuth();
-  const canCreateProject = hasRole("CONTRACTOR", "ADMIN");
+  const canCreateProject = hasRole("CLIENT", "ADMIN");
+  const isContractor = hasRole("CONTRACTOR");
+  const isClient = hasRole("CLIENT");
+  const isAdmin = hasRole("ADMIN");
+  const isReviewer = hasRole("AUDITOR", "PROCUREMENT_OFFICER");
+
+  const emptyTitle = isContractor
+    ? "No projects assigned."
+    : isClient
+      ? "No projects yet."
+      : isReviewer
+        ? "No projects available for review."
+        : "No projects available.";
+  const emptyDescription = isContractor
+    ? "Projects assigned to you by clients will appear here."
+    : isClient
+      ? "Create your first project to begin assigning contractors."
+      : isReviewer
+        ? "Projects within your authorized review scope will appear here."
+        : "No projects are available to this account.";
 
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Projects"
-        description="Project records from the ContractorProof API. Status values are shown exactly as returned. This is not a completion or trust score."
+        title={isContractor ? "My Projects" : "Projects"}
+        description={isContractor
+          ? "These are projects assigned to you. Open a project to review its milestones and submit evidence."
+          : isClient
+            ? "Manage your projects, contractor assignments, milestones, and evidence."
+            : isAdmin
+              ? "Manage system projects and contractor assignments, and review authorized evidence."
+              : "Projects available within your authorized oversight scope."}
         actions={
           canCreateProject ? (
             <Link
@@ -32,12 +57,12 @@ export function ProjectsPage() {
         error={error}
         onRetry={() => void retry()}
         loadingMessage="Loading project information..."
-        emptyTitle="No projects available."
-        emptyDescription="The API returned no project records."
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
       >
         <ProjectList records={records} />
       </QueryPanel>
-      <NestLookupForm />
+      {canCreateProject ? <NestLookupForm /> : null}
     </section>
   );
 }

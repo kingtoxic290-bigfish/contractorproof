@@ -31,7 +31,7 @@ export function QueryPanel({
   if (status === "unavailable") {
     return (
       <UnavailableState
-        message={error ?? "This information is not available from the API yet."}
+        message={error ?? "This information is currently unavailable."}
         onRetry={onRetry}
       />
     );

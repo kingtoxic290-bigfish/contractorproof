@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "../../../services/api/client";
 import { projectRecord } from "../../../tests/fixtures";
-import { createProject, getProject, listProjects } from "./projectsApi";
+import { assignProjectContractor, createProject, getProject, listProjects } from "./projectsApi";
 
 vi.mock("../../../services/api/client", () => ({
   apiRequest: vi.fn(),
@@ -74,6 +74,7 @@ describe("projectsApi envelopes", () => {
     await expect(
       createProject({
         name: "New bridge",
+        contractorId: "contractor-1",
         description: "Bridge description",
       }),
     ).resolves.toEqual(next);
@@ -81,6 +82,7 @@ describe("projectsApi envelopes", () => {
       method: "POST",
       body: {
         name: "New bridge",
+        contractorId: "contractor-1",
         description: "Bridge description",
       },
     });
@@ -92,7 +94,19 @@ describe("projectsApi envelopes", () => {
     await expect(
       createProject({
         name: "New bridge",
+        contractorId: "contractor-1",
       }),
     ).rejects.toThrow("The project creation response is not in a known format.");
+  });
+
+  it("assigns a contractor through the project-scoped backend action", async () => {
+    const assigned = projectRecord({ id: "p1", name: "Bridge deck", contractorId: "contractor-2", contractorName: "New Contractor" });
+    vi.mocked(apiRequest).mockResolvedValue({ data: { project: assigned }, meta: {} });
+
+    await expect(assignProjectContractor("p1", "contractor-2")).resolves.toEqual(assigned);
+    expect(apiRequest).toHaveBeenCalledWith("/projects/p1/contractor", {
+      method: "PATCH",
+      body: { contractorId: "contractor-2" },
+    });
   });
 });

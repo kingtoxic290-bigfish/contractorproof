@@ -2,7 +2,10 @@ import { asNullableString, asRequiredString, isPlainRecord } from "../shared/que
 
 export type PublicProject = {
   id: string;
+  clientId: string | null;
+  clientName: string | null;
   contractorId: string;
+  contractorName: string;
   name: string;
   description: string | null;
   nestTenderReference: string | null;
@@ -23,18 +26,24 @@ export function parsePublicProject(value: unknown): PublicProject | null {
   }
 
   const id = asRequiredString(value.id);
+  const clientId = asNullableString(value.clientId);
+  const clientName = asNullableString(value.clientName);
   const contractorId = asRequiredString(value.contractorId);
+  const contractorName = asRequiredString(value.contractorName);
   const name = asRequiredString(value.name);
   const nestSource = asRequiredString(value.nestSource);
   const createdAt = asRequiredString(value.createdAt);
   const updatedAt = asRequiredString(value.updatedAt);
-  if (!id || !contractorId || !name || !nestSource || !createdAt || !updatedAt) {
+  if (!id || !contractorId || !contractorName || !name || !nestSource || !createdAt || !updatedAt) {
     return null;
   }
 
   return {
     id,
+    clientId,
+    clientName,
     contractorId,
+    contractorName,
     name,
     description: asNullableString(value.description),
     nestTenderReference: asNullableString(value.nestTenderReference),

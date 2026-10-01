@@ -4,9 +4,9 @@ import { ShieldCheck } from "lucide-react";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { useAuth } from "../hooks/useAuth";
-import { ROLES, type Role } from "../types/roles";
+import type { Role } from "../types/roles";
 
-const REGISTER_ROLES = ROLES.filter((role) => role !== "ADMIN");
+const REGISTER_ROLES: Role[] = ["CLIENT", "CONTRACTOR"];
 
 const FIELD_CLASSES =
   "w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]";

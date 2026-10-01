@@ -268,7 +268,8 @@ describe("evidence versioning", () => {
     expect(persistedUser?.email).toBe(user.email);
     expect(persistedContractor?.legalName).toBe("Agent 3 Contractor");
     expect(persistedProject?.name).toBe("Agent 3 Project");
-    expect(persistedContractor?.crbSource).toBe("SYNTHETIC_DEMO");
+    // Registration never asserts CRB data; a check must actually run first.
+    expect(persistedContractor?.crbSource).toBeNull();
     expect(persistedProject?.nestSource).toBe("SYNTHETIC_DEMO");
   });
 });

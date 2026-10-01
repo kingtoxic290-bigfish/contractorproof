@@ -59,6 +59,24 @@ export async function createProject(
   }
 }
 
+export async function assignProjectContractor(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const project = await projectService.assignContractor(
+      actor,
+      requireUuid(req.params.projectId, "projectId"),
+      req.body ?? {},
+    );
+    sendData(res, { project });
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function listProjectMilestones(
   req: Request,
   res: Response,

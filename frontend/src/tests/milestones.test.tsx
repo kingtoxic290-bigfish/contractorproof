@@ -7,6 +7,8 @@ import {
   listProjectMilestones,
 } from "../features/milestones/api/milestonesApi";
 import { listEvidence } from "../features/evidence/api/evidenceApi";
+import { getProject } from "../features/projects/api/projectsApi";
+import { listContractors } from "../features/contractors/api/contractorsApi";
 import { authApi } from "../services/api/auth";
 import { ApiError } from "../services/api/errors";
 import { milestoneRecord } from "./fixtures";
@@ -30,6 +32,17 @@ vi.mock("../features/evidence/api/evidenceApi", () => ({
   listEvidence: vi.fn(),
 }));
 
+vi.mock("../features/projects/api/projectsApi", () => ({
+  getProject: vi.fn(),
+  listProjects: vi.fn(),
+  createProject: vi.fn(),
+}));
+
+vi.mock("../features/contractors/api/contractorsApi", () => ({
+  listContractors: vi.fn(),
+  getContractor: vi.fn(),
+}));
+
 describe("milestones", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,6 +54,26 @@ describe("milestones", () => {
       role: "AUDITOR",
     });
     vi.mocked(listEvidence).mockResolvedValue([]);
+    vi.mocked(listContractors).mockResolvedValue([]);
+    vi.mocked(getProject).mockResolvedValue({
+      id: "p1",
+      clientId: "client-1",
+      clientName: "Demo Client",
+      contractorId: "contractor-1",
+      contractorName: "Assigned Contractor",
+      name: "Foundation",
+      description: null,
+      nestTenderReference: null,
+      nestContractReference: null,
+      ocid: null,
+      procuringEntity: null,
+      contractStatus: "ACTIVE",
+      contractStartDate: null,
+      contractEndDate: null,
+      nestSource: "SYNTHETIC_DEMO",
+      createdAt: "2026-09-24T07:49:43.000Z",
+      updatedAt: "2026-09-24T07:49:43.000Z",
+    });
   });
 
   it("does not fetch until a project identifier is provided", async () => {
@@ -156,7 +189,7 @@ describe("milestones", () => {
       id: "user-contractor",
       email: "contractor@example.com",
       fullName: "Demo Contractor",
-      role: "CONTRACTOR",
+      role: "CLIENT",
     });
     vi.mocked(createMilestone).mockResolvedValue(
       milestoneRecord({ id: "m-new", name: "Inspection", status: "PENDING", projectId: "p1" }),
@@ -169,11 +202,26 @@ describe("milestones", () => {
     await user.type(screen.getByLabelText("Description"), "Site inspection");
     await user.click(screen.getByRole("button", { name: "Create milestone" }));
 
-    expect(await screen.findByRole("heading", { name: /Project/ })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Foundation" })).toBeInTheDocument();
+    expect(getProject).toHaveBeenCalledWith("p1");
     expect(createMilestone).toHaveBeenCalledWith("p1", {
       name: "Inspection",
       description: "Site inspection",
     });
+  });
+
+  it("blocks contractors from directly opening milestone configuration", async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: "user-contractor",
+      email: "contractor@example.com",
+      fullName: "Demo Contractor",
+      role: "CONTRACTOR",
+    });
+    renderApp("/projects/p1/milestones/new");
+
+    expect(await screen.findByRole("heading", { name: "Access denied" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Milestone name")).not.toBeInTheDocument();
+    expect(createMilestone).not.toHaveBeenCalled();
   });
 
   it("shows milestone creation authorization and not-found failures", async () => {
@@ -182,7 +230,7 @@ describe("milestones", () => {
       id: "user-contractor",
       email: "contractor@example.com",
       fullName: "Demo Contractor",
-      role: "CONTRACTOR",
+      role: "CLIENT",
     });
     vi.mocked(createMilestone).mockRejectedValueOnce(new ApiError(403, "insufficient permission"));
     renderApp("/projects/p1/milestones/new");

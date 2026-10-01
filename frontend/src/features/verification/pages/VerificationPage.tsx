@@ -8,6 +8,7 @@ import type { PublicEvidence } from "../../evidence/types";
 import { QueryPanel } from "../../shared/QueryPanel";
 import { AttestationForm } from "../components/AttestationForm";
 import { EvidenceReview } from "../components/EvidenceReview";
+import { HumanReview } from "../components/HumanReview";
 import { VerificationCompare } from "../components/VerificationCompare";
 import { VerificationHistory } from "../components/VerificationHistory";
 import { isUuid } from "../validation";
@@ -67,12 +68,12 @@ export function VerificationPage() {
     <section className="space-y-6">
       <PageHeader
         title="Verification"
-        description="Authorized reviewers compare evidence fingerprints and may record an attestation. Upload success, a SHA-256 value, or API availability is not a verification decision."
+        description="Review submitted evidence, inspect the system-controlled technical result, and record an attestation where your role and project policy permit."
       />
 
       <Card
-        title="Review queue"
-        description="There is no GET /api/v1/verification list. This page lists accessible evidence from GET /api/v1/evidence so a reviewer can see what they are verifying."
+        title="1. Submitted evidence"
+        description="Filter by project or milestone to find the evidence record you want to verify. Select a record to load its fingerprint comparison and attestation panels."
       >
         <form className="grid gap-3 sm:grid-cols-2" onSubmit={applyFilters}>
           <label className="block text-sm">
@@ -105,8 +106,7 @@ export function VerificationPage() {
           >
             evidence
           </Link>{" "}
-          page. CLIENT and CONSULTANT_ENGINEER currently receive an empty evidence list from the
-          API unless project membership is added later.
+          page, or navigate here from a project or milestone.
         </p>
       </Card>
 
@@ -115,8 +115,8 @@ export function VerificationPage() {
         error={error}
         onRetry={() => void retry()}
         loadingMessage="Loading evidence for review..."
-        emptyTitle="No evidence available to review."
-        emptyDescription="GET /api/v1/evidence returned no records for this view. Identifiers in the address bar can still be submitted if the API allows access."
+        emptyTitle="No evidence is currently available to review."
+        emptyDescription="No evidence records were returned for the current filter. Adjust the project or milestone filter, or open evidence from the evidence page."
       >
         <ul className="grid gap-3">
           {records.map((record) => {
@@ -149,11 +149,34 @@ export function VerificationPage() {
         projectId={projectId}
       />
 
-      <VerificationHistory evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
+      <section aria-label="Technical verification" className="space-y-6">
+        <h2 className="font-serif text-xl text-stone-900">2. Technical verification</h2>
+        <p className="text-sm text-stone-600">
+          Results are system-controlled and immutable to users. Only authorized internal reviewers can request a new technical comparison.
+        </p>
+        <VerificationHistory evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
+        <VerificationCompare evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
+      </section>
 
-      <VerificationCompare evidenceId={evidenceId} evidenceVersionId={selectedVersionId} />
+      <section aria-label="Human review" className="space-y-6">
+        <h2 className="font-serif text-xl text-stone-900">3. Human review</h2>
+        <p className="text-sm text-stone-600">
+          Human review is separate from technical verification. Correction and dispute records use their own authorized workflows.
+        </p>
+        <HumanReview
+          evidenceId={evidenceId}
+          milestoneId={selectedMilestoneId}
+          projectId={projectId}
+        />
+      </section>
 
-      <AttestationForm evidenceId={evidenceId} milestoneId={selectedMilestoneId} />
+      <section aria-label="Attestation" className="space-y-6">
+        <h2 className="font-serif text-xl text-stone-900">4. Attestation</h2>
+        <p className="text-sm text-stone-600">
+          An explicit decision recorded separately from the technical comparison. Available only where the backend role and project policy permit it.
+        </p>
+        <AttestationForm evidenceId={evidenceId} milestoneId={selectedMilestoneId} />
+      </section>
     </section>
   );
 }

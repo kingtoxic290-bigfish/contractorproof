@@ -44,7 +44,7 @@ function eventsFor(passport: ProjectPassport): HistoryEvent[] {
 export function PassportTimeline({ passport }: { passport: ProjectPassport }) {
   const events = eventsFor(passport);
   return (
-    <Card title="Record history" description="Chronological entries derived only from timestamped records in the Passport projection." icon={History}>
+    <Card title="Record history" description="Chronological entries from timestamped project, milestone, evidence, verification, attestation, and proof records." icon={History}>
       {events.length ? (
         <ol className="divide-y divide-stone-200">
           {events.map((event, index) => (
@@ -57,7 +57,7 @@ export function PassportTimeline({ passport }: { passport: ProjectPassport }) {
             </li>
           ))}
         </ol>
-      ) : <p className="text-sm text-stone-600">No dated records were returned in this Passport projection.</p>}
+      ) : <p className="text-sm text-stone-600">No dated records were found in this Passport.</p>}
     </Card>
   );
 }

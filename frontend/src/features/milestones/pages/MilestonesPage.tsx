@@ -22,7 +22,7 @@ export function MilestonesPage() {
     <section className="space-y-6">
       <PageHeader
         title="Milestones"
-        description="Milestones are requested from GET /api/v1/projects/:projectId/milestones. There is no standalone milestones collection. Status text is shown exactly as returned."
+        description="Milestones belong to a project. Enter a project identifier to load its milestones, or open milestones directly from a project."
       />
       <Card title="Load milestones for a project">
         <form className="flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={onSubmit}>
@@ -52,7 +52,7 @@ export function MilestonesPage() {
         onRetry={() => void retry()}
         loadingMessage="Loading milestone information..."
         emptyTitle="No milestones available."
-        emptyDescription="The API returned no milestone records for this project."
+        emptyDescription="No milestone records were found for this project."
       >
         <MilestoneList records={records} projectId={projectId} />
       </QueryPanel>

@@ -11,7 +11,7 @@ export function ContractorsPage() {
     <section className="space-y-6">
       <PageHeader
         title="Contractors"
-        description="Contractor records from the ContractorProof API. This screen does not calculate a trust score or performance rating."
+        description="Registered contractor records. This screen does not calculate a trust score or performance rating."
       />
       <QueryPanel
         status={status}
@@ -19,7 +19,7 @@ export function ContractorsPage() {
         onRetry={() => void retry()}
         loadingMessage="Loading contractor information..."
         emptyTitle="No contractors available."
-        emptyDescription="The API returned no contractor records."
+        emptyDescription="No contractor records were found for this account."
       >
         <ContractorList records={records} />
       </QueryPanel>

@@ -2,8 +2,8 @@ import type { Role } from "@prisma/client";
 import { authorize } from "../middleware/authorize";
 
 export const PERMISSIONS = {
-  PROJECT_WRITE: ["CONTRACTOR", "ADMIN"],
-  MILESTONE_WRITE: ["CONTRACTOR", "ADMIN"],
+  PROJECT_WRITE: ["CLIENT", "ADMIN"],
+  MILESTONE_WRITE: ["CLIENT", "ADMIN"],
   EVIDENCE_UPLOAD: ["CONTRACTOR", "ADMIN"],
   EVIDENCE_READ: [
     "ADMIN",
@@ -18,7 +18,6 @@ export const PERMISSIONS = {
     "AUDITOR",
     "PROCUREMENT_OFFICER",
     "CONSULTANT_ENGINEER",
-    "CLIENT",
   ],
   ATTEST: ["CONSULTANT_ENGINEER", "CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
   DISPUTE_CREATE: ["CONTRACTOR", "ADMIN", "CLIENT", "CONSULTANT_ENGINEER"],
@@ -42,8 +41,23 @@ export const PERMISSIONS = {
   ],
   CORRECTION_RESOLVE: ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"],
   VARIATION_CREATE: ["CONTRACTOR", "ADMIN"],
-  VARIATION_READ: ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER", "CONTRACTOR"],
+  VARIATION_READ: ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER", "CONTRACTOR", "CLIENT"],
   VARIATION_RESOLVE: ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"],
+  /// Run a CRB registration check. Deliberately excludes CONTRACTOR: a
+  /// contractor may read their own status but may not initiate checks.
+  CRB_VERIFY: ["CLIENT", "CONSULTANT_ENGINEER", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
+  /// Read recorded CRB status, including a contractor's own record.
+  CRB_READ: [
+    "CONTRACTOR",
+    "CLIENT",
+    "CONSULTANT_ENGINEER",
+    "PROCUREMENT_OFFICER",
+    "AUDITOR",
+    "ADMIN",
+  ],
+  PROCUREMENT_READ: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"],
+  PROCUREMENT_SYNC: ["ADMIN", "PROCUREMENT_OFFICER"],
+  PROCUREMENT_LINK: ["ADMIN", "PROCUREMENT_OFFICER"],
   PROVISION_USERS: ["ADMIN"],
   AUDIT_READ: ["AUDITOR", "ADMIN", "PROCUREMENT_OFFICER"],
 } as const satisfies Record<string, readonly Role[]>;

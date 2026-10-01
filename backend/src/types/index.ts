@@ -17,7 +17,8 @@ export type PublicContractor = {
   crbClass: string | null;
   crbStatus: string | null;
   crbLastVerifiedAt: string | null;
-  crbSource: string;
+  /** Null until an actual CRB check has been performed against a source. */
+  crbSource: string | null;
   createdAt: string;
   updatedAt: string;
   user: PublicUser;
@@ -25,7 +26,10 @@ export type PublicContractor = {
 
 export type PublicProject = {
   id: string;
+  clientId: string | null;
+  clientName: string | null;
   contractorId: string;
+  contractorName: string;
   name: string;
   description: string | null;
   nestTenderReference: string | null;

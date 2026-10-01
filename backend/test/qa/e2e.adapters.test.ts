@@ -6,24 +6,8 @@ import { assertNoSecrets, cleanupQaUsers, registerContractor } from "./fixtures"
 describe("synthetic external adapters", () => {
   afterEach(cleanupQaUsers);
 
-  it("labels CRB and NeST results as SYNTHETIC_DEMO, including misses", async () => {
+  it("labels NeST results as SYNTHETIC_DEMO, including misses", async () => {
     const user = await registerContractor();
-
-    const crb = await request(app)
-      .get("/api/v1/integrations/crb/CRB-DEMO-001")
-      .set("Authorization", `Bearer ${user.token}`);
-    expect(crb.status).toBe(200);
-    expect(crb.body.source).toBe("SYNTHETIC_DEMO");
-    expect(crb.body.notice).toMatch(/synthetic\/demo/i);
-    expect(crb.body.notice).toMatch(/no live/i);
-    assertNoSecrets(crb.body);
-
-    const crbMiss = await request(app)
-      .get("/api/v1/integrations/crb/UNKNOWN-CRB")
-      .set("Authorization", `Bearer ${user.token}`);
-    expect(crbMiss.status).toBe(200);
-    expect(crbMiss.body.source).toBe("SYNTHETIC_DEMO");
-    expect(crbMiss.body.found).toBe(false);
 
     const nest = await request(app)
       .get("/api/v1/integrations/nest/NEST-DEMO-100")
@@ -42,9 +26,19 @@ describe("synthetic external adapters", () => {
   });
 
   it("does not expose adapter lookups without authentication", async () => {
-    const crb = await request(app).get("/api/v1/integrations/crb/CRB-DEMO-001");
+    const crb = await request(app).get(
+      "/api/v1/contractors/00000000-0000-4000-8000-000000000000/crb",
+    );
     const nest = await request(app).get("/api/v1/integrations/nest/NEST-DEMO-100");
     expect(crb.status).toBe(401);
     expect(nest.status).toBe(401);
+  });
+
+  it("no longer exposes the unaudited CRB lookup route", async () => {
+    const user = await registerContractor();
+    const response = await request(app)
+      .get("/api/v1/integrations/crb/CRB-DEMO-001")
+      .set("Authorization", `Bearer ${user.token}`);
+    expect(response.status).toBe(404);
   });
 });
