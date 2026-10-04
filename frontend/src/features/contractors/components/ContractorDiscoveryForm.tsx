@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Search } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { ErrorState } from "../../../components/feedback/ErrorState";
@@ -17,7 +17,12 @@ import { useContractorDiscovery } from "../hooks/useContractorDiscovery";
  * no live CRB lookup is performed here.
  */
 export function ContractorDiscoveryForm() {
-  const [registrationNumber, setRegistrationNumber] = useState("");
+  // The public landing page hands the number over as a query parameter, so a
+  // visitor does not have to retype it. As with the contractor preselect on
+  // project creation, this is only a form default: the search still runs when
+  // the client submits, and nothing is looked up from the URL alone.
+  const [searchParams] = useSearchParams();
+  const [registrationNumber, setRegistrationNumber] = useState(searchParams.get("crb") ?? "");
   const { status, records, error, lastQuery, search, reset } = useContractorDiscovery();
 
   function onSubmit(event: FormEvent) {

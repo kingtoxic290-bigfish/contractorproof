@@ -11,5 +11,9 @@
     "test:contracts": "npm test --prefix contracts",
     "db:up": "docker compose up -d",
     "db:down": "docker compose down"
+  },
+  "dependencies": {
+    "@neon/config": "^1.8.3",
+    "@neon/env": "^1.5.0"
   }
 }

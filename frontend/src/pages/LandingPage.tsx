@@ -1,220 +1,755 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  ArrowDown,
   ArrowRight,
-  BadgeCheck,
   Check,
-  CheckCircle2,
-  ClipboardCheck,
+  Construction,
   FileCheck2,
-  FileClock,
-  FileStack,
-  Fingerprint,
-  FolderKanban,
+  Flag,
   Hash,
   Menu,
   Search,
   ShieldCheck,
-  UserCheck,
   X,
 } from "lucide-react";
 import "./landing-page.css";
 
-const workflowSteps = [
-  { number: "01", title: "Discover", text: "Find a contractor using their CRB Registration Number.", icon: Search },
-  { number: "02", title: "Review", text: "Examine the contractor's recorded Passport information.", icon: ShieldCheck },
-  { number: "03", title: "Assign", text: "The client selects a contractor and creates the project.", icon: UserCheck },
-  { number: "04", title: "Document", text: "Record milestones and evidence as work progresses.", icon: FolderKanban },
-  { number: "05", title: "Prove", text: "Hash evidence and anchor authorized events as proof.", icon: Hash },
-  { number: "06", title: "Verify", text: "Compare evidence with its previously recorded proof.", icon: CheckCircle2 },
+/**
+ * Public landing page.
+ *
+ * This page explains one thing: how a client finds a contractor by CRB
+ * registration number, reviews the Contractor Passport, assigns a project, and
+ * then keeps a verifiable record of what happened during execution.
+ *
+ * It states only what the product actually does. There are no ratings, scores,
+ * rankings or recommendations anywhere on this page, and nothing here claims
+ * that a cryptographic proof establishes that construction work was truthful.
+ * Verification results are the four factual states the system records.
+ *
+ * Every outbound link points at a route this application already serves:
+ * `/login`, `/verify`, and `/contractors` (the existing CRB discovery screen).
+ * No landing-page behaviour calls an endpoint that the application does not
+ * already use.
+ */
+
+const CLIENT_STEPS = [
+  {
+    number: "01",
+    title: "Find",
+    text: "Enter the contractor's CRB Registration Number.",
+  },
+  {
+    number: "02",
+    title: "Review",
+    text: "Open the Contractor Passport and review the recorded contractor and project history.",
+  },
+  {
+    number: "03",
+    title: "Assign",
+    text: "The Client selects the contractor and creates the project.",
+  },
+  {
+    number: "04",
+    title: "Verify",
+    text: "Milestones, evidence and verification events are recorded throughout project execution.",
+  },
 ];
 
-const lifecycle = [
-  "Project created",
-  "Milestone created",
-  "Evidence submitted",
-  "Inspection and review",
-  "Approval or correction",
-  "Dispute and resolution",
-  "Completion",
-  "Historical record",
+/**
+ * What a project goes through, in the order the application records it.
+ *
+ * The last stage is the point of the whole record: earlier entries stay visible
+ * after a correction or a dispute is resolved.
+ */
+const EXECUTION_STAGES = [
+  { label: "Project created", note: "The client creates the project and assigns the contractor." },
+  { label: "Milestone", note: "The agreed stages of work are recorded against the project." },
+  { label: "Evidence", note: "The assigned contractor documents the work with evidence." },
+  { label: "Inspection / review", note: "An authorised reviewer compares the evidence." },
+  { label: "Approval", note: "The client records the review decision." },
+  { label: "Correction / dispute", note: "A disagreement is raised rather than overwritten." },
+  { label: "Resolution", note: "The outcome is recorded against the original entry." },
+  { label: "Completion", note: "Execution is closed once the recorded stages are complete." },
+  { label: "Historical record", note: "The project Passport keeps the full sequence." },
 ];
 
-const problems = [
-  { title: "Fragmented records", text: "Contractor information, project documents and milestone evidence are often scattered across different systems.", icon: FileStack },
-  { title: "Difficult verification", text: "A registration record alone cannot explain what happened during project execution.", icon: Search },
-  { title: "Evidence can be disputed", text: "When evidence changes, it can be difficult to establish which version was originally recorded.", icon: FileClock },
-  { title: "Lost project history", text: "Completed work should become a useful historical record, not disappear into disconnected files.", icon: FolderKanban },
+/**
+ * The proof pipeline. Documents stay in controlled storage; only proofs of
+ * those documents are anchored.
+ */
+const PROOF_STAGES = [
+  "Evidence",
+  "SHA-256 hash",
+  "Authorised verification",
+  "Blockchain proof",
+  "Verification",
 ];
 
-const statuses = [
-  { name: "MATCH", title: "Evidence matches", detail: "The submitted evidence matches the recorded cryptographic proof.", className: "match", icon: CheckCircle2 },
-  { name: "MISMATCH", title: "Evidence differs", detail: "The submitted evidence does not match the recorded proof.", className: "mismatch", icon: Fingerprint },
-  { name: "PENDING", title: "Not yet complete", detail: "Verification has not yet been completed.", className: "pending", icon: FileClock },
-  { name: "UNAVAILABLE", title: "Cannot be checked", detail: "The proof cannot currently be checked.", className: "unavailable", icon: ShieldCheck },
+const VERIFICATION_STATES = [
+  {
+    name: "MATCH",
+    detail: "Evidence matches the recorded cryptographic proof.",
+    tone: "positive",
+  },
+  {
+    name: "MISMATCH",
+    detail: "Evidence does not match the recorded proof.",
+    tone: "negative",
+  },
+  {
+    name: "PENDING",
+    detail: "Verification has not yet been completed.",
+    tone: "neutral",
+  },
+  {
+    name: "UNAVAILABLE",
+    detail: "The proof cannot currently be checked.",
+    tone: "neutral",
+  },
 ];
 
-const clientActions = [
-  { title: "Discover", text: "Search and review contractors before assigning work.", icon: Search },
-  { title: "Assign", text: "Create projects and assign contractors from recorded profiles.", icon: UserCheck },
-  { title: "Manage", text: "Track milestones, evidence, inspections and project progress.", icon: ClipboardCheck },
-  { title: "Verify", text: "Establish whether submitted evidence matches recorded proof.", icon: BadgeCheck },
+const CLIENT_ACTIONS = [
+  { title: "Discover", text: "Find a contractor using the CRB Registration Number." },
+  { title: "Review", text: "View the Contractor Passport before assignment." },
+  { title: "Assign", text: "Create and assign projects to contractors." },
+  { title: "Verify", text: "Track milestones, evidence and verification throughout execution." },
 ];
 
-const contractorActions = [
-  { title: "Assigned projects", text: "See work assigned to your contractor account.", icon: FolderKanban },
-  { title: "Milestone evidence", text: "Record progress and submit evidence against project milestones.", icon: FileCheck2 },
-  { title: "Verification history", text: "Review recorded outcomes and the history of submissions.", icon: ShieldCheck },
-  { title: "Project Passport", text: "Build a structured record of completed, verified work.", icon: FileStack },
+const CONTRACTOR_ACTIONS = [
+  "Assigned projects",
+  "Milestone evidence",
+  "Verification history",
+  "Project passport",
 ];
 
-function Mark({ compact = false }: { compact?: boolean }) {
+const PASSPORT_SAMPLE_PROJECTS = [
+  "Road Rehabilitation Project",
+  "Building Construction Project",
+  "Water Infrastructure Project",
+];
+
+const NAV_LINKS = [
+  { href: "#passport", label: "Contractor Passport" },
+  { href: "#how-it-works", label: "How It Works" },
+  { href: "#verification", label: "Verification" },
+];
+
+/**
+ * Photographs supplied for the page, mapped to the section each one supports.
+ *
+ * Filenames carry the spaces and parentheses they were pasted with, so the
+ * paths are percent-encoded to match what the browser requests. The hero is not
+ * listed here: it is a background layer set through `--lp-hero-image` in the
+ * stylesheet.
+ *
+ * These are illustrations of work the surrounding copy already describes. They
+ * deliberately carry no caption, because a caption would assert something about
+ * the photograph that the page cannot verify.
+ */
+const SECTION_IMAGES = {
+  discovery: {
+    src: "/images/Pasted%20image.png",
+    alt: "Contractor discovery and site review",
+  },
+  execution: {
+    src: "/images/Pasted%20image%20(4).png",
+    alt: "Project execution and site works",
+  },
+  evidence: {
+    src: "/images/Pasted%20image%20(3).png",
+    alt: "Site evidence recorded during inspection",
+  },
+} as const;
+
+/**
+ * A section that fades in once it enters the viewport.
+ *
+ * Renders visible by default. The hidden starting state is only applied once
+ * the browser reports that it supports IntersectionObserver and that the visitor
+ * has not asked for reduced motion, so content is never trapped behind an
+ * effect that may not run.
+ */
+function Reveal({ children, className = "" }: { children: ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [waiting, setWaiting] = useState(false);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    if (typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return;
+    }
+
+    setWaiting(true);
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setWaiting(false);
+            observer.disconnect();
+          }
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.04 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <span className={`landing-mark${compact ? " compact" : ""}`} aria-hidden="true">
-      <ShieldCheck />
-    </span>
-  );
-}
-
-function SectionEyebrow({ children }: { children: string }) {
-  return <p className="landing-eyebrow">{children}</p>;
-}
-
-function PassportMockup() {
-  return (
-    <div className="passport-stage" aria-label="Illustrative Contractor Passport interface">
-      <div className="passport-note"><span className="note-dot" /> Illustrative interface · sample data</div>
-      <article className="passport-card">
-        <header className="passport-card-head">
-          <div className="passport-card-brand"><Mark compact /><span>CONTRACTOR<br />PASSPORT</span></div>
-          <span className="passport-record-id">CP · SAMPLE</span>
-        </header>
-        <div className="passport-identity">
-          <div className="company-monogram" aria-hidden="true">AB</div>
-          <div className="passport-name"><p>CONTRACTOR</p><h3>ABC Builders Ltd</h3><span>CRB Registration · CRB/XXXX/XXXX</span></div>
-          <div className="record-status"><Check aria-hidden="true" /> VERIFIED RECORD</div>
-        </div>
-        <div className="passport-metrics">
-          <div><strong>12</strong><span>Projects</span></div>
-          <div><strong>48</strong><span>Completed milestones</span></div>
-          <div><strong>126</strong><span>Evidence records</span></div>
-        </div>
-        <div className="passport-project">
-          <div className="project-row"><span className="project-kicker">RECENT PROJECT · SAMPLE</span><span className="project-verified"><CheckCircle2 /> VERIFIED HISTORY</span></div>
-          <h4>North district clinic extension</h4>
-          <div className="project-details"><span>4 milestones</span><span>Evidence history retained</span></div>
-        </div>
-        <div className="passport-card-foot"><span><ShieldCheck /> Factual project history</span><span>No ratings or rankings</span></div>
-      </article>
-      <div className="proof-path" aria-label="Project evidence proof chain">
-        <span>PROJECT</span><ArrowRight /><span>MILESTONE</span><ArrowRight /><span>EVIDENCE</span><ArrowRight /><span>SHA-256</span><ArrowRight /><span>BLOCKCHAIN PROOF</span><ArrowRight /><b><Check /> MATCH</b>
-      </div>
+    <div ref={ref} className={`${waiting ? "lp-reveal-pending" : ""} ${className}`.trim()}>
+      {children}
     </div>
   );
 }
 
-function PipelineMockup() {
+function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="lp-eyebrow">{children}</p>;
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children?: ReactNode;
+}) {
   return (
-    <div className="pipeline-card" aria-label="Illustrative evidence verification record">
-      <div className="pipeline-card-top"><div><span className="pipeline-overline">EVIDENCE RECORD</span><h3>Foundation inspection report.pdf</h3></div><span className="file-icon"><FileCheck2 /></span></div>
-      <div className="pipeline-line">
-        <div className="pipeline-node"><span className="pipeline-node-icon"><FileCheck2 /></span><div><small>01 · FILE</small><strong>Evidence stored</strong></div></div>
-        <div className="pipeline-node"><span className="pipeline-node-icon"><Hash /></span><div><small>02 · FINGERPRINT</small><strong>SHA-256 generated</strong></div></div>
-        <div className="pipeline-node"><span className="pipeline-node-icon"><ShieldCheck /></span><div><small>03 · PROOF</small><strong>Authorized verification</strong></div></div>
-      </div>
-      <div className="pipeline-result"><div><small>SHA-256 · TRUNCATED EXAMPLE</small><code>8f3a...91c2</code></div><div className="pipeline-confirmed"><CheckCircle2 /><span><small>RESULT</small><strong>MATCH · CONFIRMED</strong></span></div></div>
-      <p className="pipeline-caption">Illustrative sample only. A real result depends on a recorded proof and successful verification.</p>
+    <div className="lp-heading">
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="lp-title">{title}</h2>
+      {children ? <p className="lp-lede">{children}</p> : null}
     </div>
+  );
+}
+
+function SampleTag() {
+  return (
+    <p className="lp-sample-tag">
+      <span aria-hidden="true">Sample record</span>
+      <span className="sr-only">Illustrative interface using sample data</span>
+    </p>
+  );
+}
+
+/**
+ * A photograph supporting a section. Lazy-loaded because every instance sits
+ * below the hero, and constrained so it can never widen the page.
+ */
+function SectionImage({
+  image,
+  size = "wide",
+}: {
+  image: { src: string; alt: string };
+  size?: "wide" | "compact";
+}) {
+  return (
+    <figure className={`lp-figure lp-figure-${size}`}>
+      <img src={image.src} alt={image.alt} loading="lazy" decoding="async" />
+    </figure>
+  );
+}
+
+/**
+ * Shape of a Contractor Passport entry, shown so a visitor knows what they will
+ * be reading. Every value is illustrative.
+ */
+function PassportPreview() {
+  const totals = [
+    { label: "Projects", value: "12" },
+    { label: "Completed milestones", value: "48" },
+    { label: "Verified evidence", value: "126" },
+  ];
+
+  return (
+    <figure className="lp-card lp-passport">
+      <SampleTag />
+      <div className="lp-passport-head">
+        <p className="lp-passport-name">ABC Builders Ltd</p>
+        <dl className="lp-passport-identity">
+          <div>
+            <dt>CRB Registration</dt>
+            <dd className="font-mono">CRB/1234/2024</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>Verified record</dd>
+          </div>
+        </dl>
+      </div>
+
+      <dl className="lp-passport-totals">
+        {totals.map((total) => (
+          <div key={total.label}>
+            <dt>{total.label}</dt>
+            <dd>{total.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="lp-passport-history">
+        <p className="lp-subhead">Recent project history</p>
+        <ul>
+          {PASSPORT_SAMPLE_PROJECTS.map((project) => (
+            <li key={project}>
+              <Construction aria-hidden="true" />
+              {project}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </figure>
   );
 }
 
 export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <main className="landing-page" id="top">
-      <a className="landing-skip" href="#main-content">Skip to content</a>
-      <header className="landing-header">
-        <a className="landing-brand" href="#top" aria-label="ContractorProof home" onClick={closeMenu}>
-          <Mark /><span>ContractorProof<small>PROJECT EVIDENCE &amp; VERIFICATION</small></span>
-        </a>
-        <button className="landing-menu-toggle" type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} aria-expanded={menuOpen} aria-controls="landing-navigation" onClick={() => setMenuOpen((open) => !open)}>
-          {menuOpen ? <X /> : <Menu />}
-        </button>
-        <nav id="landing-navigation" className={`landing-nav${menuOpen ? " is-open" : ""}`} aria-label="Main navigation">
-          <a href="#passport" onClick={closeMenu}>Contractor Passport</a>
-          <a href="#workflow" onClick={closeMenu}>How it works</a>
-          <a href="#verification" onClick={closeMenu}>Verification</a>
-          <a href="#clients" onClick={closeMenu}>For clients</a>
-          <a href="#contractors" onClick={closeMenu}>For contractors</a>
-          <Link className="nav-sign-in" to="/login" onClick={closeMenu}>Sign in <ArrowRight /></Link>
-        </nav>
+    <div className="lp-root">
+      <a className="lp-skip" href="#main-content">
+        Skip to main content
+      </a>
+
+      <header className="lp-header">
+        <div className="lp-shell lp-header-inner">
+          <a className="lp-brand" href="#top" onClick={closeMenu}>
+            <span className="lp-brand-mark" aria-hidden="true">
+              <ShieldCheck />
+            </span>
+            <span>ContractorProof</span>
+          </a>
+
+          <button
+            type="button"
+            className="lp-menu-toggle"
+            aria-label={menuOpen ? "Close navigation" : "Open navigation"}
+            aria-expanded={menuOpen}
+            aria-controls="landing-navigation"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
+          </button>
+
+          <nav
+            id="landing-navigation"
+            className={`lp-nav${menuOpen ? " is-open" : ""}`}
+            aria-label="Main navigation"
+          >
+            {NAV_LINKS.map((link) => (
+              <a key={link.href} href={link.href} onClick={closeMenu}>
+                {link.label}
+              </a>
+            ))}
+            <Link className="lp-nav-signin" to="/login" onClick={closeMenu}>
+              Sign In
+            </Link>
+          </nav>
+        </div>
       </header>
 
-      <div id="main-content">
-        <section className="landing-hero">
-          <div className="hero-grid" aria-hidden="true" />
-          <div className="hero-copy">
-            <SectionEyebrow>CONSTRUCTION PROJECT EVIDENCE</SectionEyebrow>
-            <h1>Build with confidence.<br /><span>Verify every project.</span><br />Preserve every proof.</h1>
-            <p>ContractorProof creates a verifiable digital history of contractor projects — connecting contractor records, project milestones, evidence, verification and blockchain-backed proof.</p>
-            <div className="hero-actions">
-              <a className="landing-button button-primary" href="#passport">Explore Contractor Passport <ArrowRight /></a>
-              <a className="landing-button button-light" href="#workflow">See how it works <ArrowDown /></a>
+      <main id="main-content">
+        {/* Hero. The photograph layer sits behind a dark overlay so the text
+            keeps its contrast whether or not an image has been supplied. */}
+        <section className="lp-hero" id="top">
+          <div className="lp-hero-media" aria-hidden="true" />
+          <div className="lp-shell lp-hero-inner">
+            <p className="lp-hero-eyebrow">
+              <Construction aria-hidden="true" />
+              Contractor records and project verification
+            </p>
+            <h1 className="lp-hero-title">
+              Know the Contractor.
+              <br />
+              Verify the Project.
+              <br />
+              Keep the Proof.
+            </h1>
+            <p className="lp-hero-lede">
+              ContractorProof helps clients discover contractors using their CRB registration
+              number, review their Contractor Passport, assign projects, and preserve verifiable
+              project history.
+            </p>
+            <div className="lp-hero-actions">
+              <a className="lp-btn lp-btn-primary" href="#find">
+                Find a Contractor
+              </a>
+              <Link className="lp-btn lp-btn-ghost-light" to="/login">
+                Sign In
+              </Link>
             </div>
-            <div className="hero-note"><span className="note-rule" />A shared record of project work, built from evidence.</div>
+            <p className="lp-hero-note">
+              ContractorProof records history. It does not rate, score or rank contractors.
+            </p>
           </div>
-          <PassportMockup />
-          <div className="hero-bottomline"><span>01 / PROJECT RECORDS</span><span>AN EVIDENCE-LED WORKFLOW</span><span>SCROLL TO EXPLORE ↓</span></div>
         </section>
 
-        <section className="landing-section problem-section" id="why">
-          <div className="section-heading split-heading"><div><SectionEyebrow>THE RECORD GAP</SectionEyebrow><h2>Project records should not disappear when a project ends.</h2></div><p>Construction work creates a trail of decisions, inspections and evidence. ContractorProof helps keep that trail connected and reviewable.</p></div>
-          <div className="problem-grid">{problems.map(({ title, text, icon: Icon }, index) => <article className="problem-item" key={title}><span className="problem-index">0{index + 1}</span><Icon /><h3>{title}</h3><p>{text}</p></article>)}</div>
+        {/* The client's first action. */}
+        <section className="lp-section" id="find">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="Start here" title="Find a Contractor">
+              Start with the contractor&apos;s CRB Registration Number.
+            </SectionHeading>
+
+            <div className="lp-find">
+              <form
+                className="lp-find-form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  // Hands off to the existing contractor discovery screen. This
+                  // page performs no search of its own and shows no result of
+                  // its own; it only routes to functionality that already
+                  // exists. The number travels as a query parameter because that
+                  // route sits behind the sign-in gate, and a visitor should not
+                  // have to type it twice.
+                  const entered = new FormData(event.currentTarget).get("crbRegistrationNumber");
+                  const crb = typeof entered === "string" ? entered.trim() : "";
+                  navigate(crb ? `/contractors?crb=${encodeURIComponent(crb)}` : "/contractors");
+                }}
+              >
+                <label className="lp-field" htmlFor="crb-registration">
+                  <span>CRB Registration Number</span>
+                  <span className="lp-input-row">
+                    <span className="lp-input-prefix" aria-hidden="true">
+                      <Hash />
+                    </span>
+                    <input
+                      id="crb-registration"
+                      name="crbRegistrationNumber"
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      placeholder="CRB/________________________"
+                      required
+                    />
+                    <button type="submit" className="lp-btn lp-btn-primary lp-btn-submit">
+                      <Search aria-hidden="true" />
+                      Search Contractor
+                    </button>
+                  </span>
+                </label>
+              </form>
+
+              <ol className="lp-find-path">
+                {["CRB Number", "Contractor Passport", "Review", "Assign Project"].map(
+                  (stage, index) => (
+                    <li key={stage}>
+                      <span className="lp-find-index">{index + 1}</span>
+                      {stage}
+                    </li>
+                  ),
+                )}
+              </ol>
+
+              <p className="lp-find-note">
+                Contractor discovery runs inside ContractorProof. Sign in as a client or
+                administrator to search contractor records and open a Contractor Passport.
+              </p>
+            </div>
+
+            <SectionImage image={SECTION_IMAGES.discovery} />
+          </div>
         </section>
 
-        <section className="landing-section passport-section" id="passport">
-          <div className="passport-section-copy"><SectionEyebrow>THE CONTRACTOR PASSPORT</SectionEyebrow><h2>One contractor.<br /><em>One evolving project history.</em></h2><p>ContractorProof brings contractor identity references, projects, milestones, evidence and verification history together into a Contractor Passport.</p><ul className="check-list"><li><Check /> CRB registration reference and recorded status</li><li><Check /> Project and milestone history</li><li><Check /> Evidence versions and verification outcomes</li><li><Check /> Verified history, separate from active work</li></ul><a className="text-link" href="#workflow">Explore how a Passport is built <ArrowRight /></a></div>
-          <div className="passport-section-visual"><PassportMockup /></div>
+        <section className="lp-section lp-section-alt" id="passport">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="Before you assign" title="Contractor Passport">
+              A single, evolving record of a contractor&apos;s verified project history.
+            </SectionHeading>
+
+            <div className="lp-split">
+              <div className="lp-split-copy">
+                <p>
+                  The Passport is what a client reads before deciding. It holds the
+                  contractor&apos;s registration record, the projects they were assigned, and the
+                  milestones, evidence and verification events recorded against each one.
+                </p>
+                <ul className="lp-checks">
+                  <li>
+                    <Check aria-hidden="true" />
+                    Recorded CRB registration and check history
+                  </li>
+                  <li>
+                    <Check aria-hidden="true" />
+                    Project and milestone status counts
+                  </li>
+                  <li>
+                    <Check aria-hidden="true" />
+                    Evidence, corrections and dispute records
+                  </li>
+                  <li>
+                    <Check aria-hidden="true" />
+                    Blockchain proof counts
+                  </li>
+                </ul>
+                <p className="lp-split-note">
+                  ContractorProof records history. It does not decide which contractor is
+                  &ldquo;best&rdquo;.
+                </p>
+                <Link className="lp-btn lp-btn-outline" to="/contractors">
+                  View Contractor Passport
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </div>
+              <PassportPreview />
+            </div>
+          </div>
         </section>
 
-        <section className="landing-section workflow-section" id="workflow">
-          <div className="section-heading"><SectionEyebrow>THE PROJECT PATH</SectionEyebrow><h2>From contractor discovery to verified project history.</h2><p>A client creates and assigns the project. The contractor participates in the assigned work and submits evidence as milestones progress.</p></div>
-          <ol className="workflow-grid">{workflowSteps.map(({ number, title, text, icon: Icon }) => <li className="workflow-step" key={number}><div className="workflow-top"><span>{number}</span><Icon /></div><h3>{title}</h3><p>{text}</p></li>)}</ol>
-          <div className="workflow-ribbon"><span>CLIENT DISCOVERY</span><i /><span>PROJECT EXECUTION</span><i /><span>VERIFIED HISTORY</span></div>
+        <section className="lp-section" id="how-it-works">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="The client workflow" title="From Contractor Discovery to Project History">
+              Four steps, in the order a client actually performs them.
+            </SectionHeading>
+
+            <ol className="lp-steps">
+              {CLIENT_STEPS.map((step) => (
+                <li key={step.number} className="lp-step">
+                  <span className="lp-step-number">{step.number}</span>
+                  <h3 className="lp-step-title">{step.title}</h3>
+                  <p className="lp-step-text">{step.text}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
-        <section className="evidence-section" id="evidence">
-          <div className="evidence-copy"><SectionEyebrow>DOCUMENTS OFF-CHAIN · PROOF ON-CHAIN</SectionEyebrow><h2>Blockchain proves the record.<br /><em>It does not replace the record.</em></h2><p>ContractorProof keeps project documents and application data in controlled storage. The blockchain is an integrity layer for cryptographic proof of authorized events.</p><p className="evidence-principle">Your documents stay where they belong.<br /><strong>The blockchain stores the proof, not the documents.</strong></p><a className="landing-button button-outline-light" href="#architecture">Understand the record model <ArrowRight /></a></div>
-          <PipelineMockup />
+        <section className="lp-section lp-section-alt" id="execution">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="During execution" title="Follow the Project From Start to Finish">
+              Project history evolves without silently replacing what happened before.
+              Corrections, variations and disputes remain part of the record.
+            </SectionHeading>
+
+            <SectionImage image={SECTION_IMAGES.execution} />
+
+            <ol className="lp-rail">
+              {EXECUTION_STAGES.map((stage) => (
+                <li key={stage.label} className="lp-rail-item">
+                  <span className="lp-rail-dot" aria-hidden="true" />
+                  <span className="lp-rail-label">{stage.label}</span>
+                  <span className="lp-rail-note">{stage.note}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </section>
 
-        <section className="landing-section verification-section" id="verification">
-          <div className="section-heading"><SectionEyebrow>FACTUAL VERIFICATION</SectionEyebrow><h2>Verification should answer a factual question.</h2><p>Does the evidence presented now match the evidence previously recorded? The result describes the evidence and proof state, not the contractor.</p></div>
-          <div className="status-grid">{statuses.map(({ name, title, detail, className, icon: Icon }) => <article className={`status-card ${className}`} key={name}><div className="status-card-head"><Icon /><span>{name}</span></div><h3>{title}</h3><p>{detail}</p></article>)}</div>
-          <div className="verification-link"><span>No score or judgement. Only a recorded result.</span><Link to="/verify" className="text-link">Open public verification <ArrowRight /></Link></div>
+        <section className="lp-section" id="proof">
+          <div className="lp-shell">
+            <div className="lp-split lp-split-proof">
+              <div className="lp-split-copy">
+                <SectionHeading eyebrow="Integrity layer" title="Blockchain Provides the Proof Layer">
+                  Project documents remain in controlled storage. ContractorProof creates
+                  cryptographic proofs of recorded evidence and uses blockchain to preserve the
+                  integrity of those proofs.
+                </SectionHeading>
+                <p className="lp-principle">
+                  Blockchain proves that the recorded evidence matches the anchored cryptographic
+                  proof. It does not independently prove that the construction work was truthful.
+                </p>
+              </div>
+
+              <figure className="lp-card lp-pipeline">
+                <SampleTag />
+                <p className="lp-subhead">Proof pipeline</p>
+                <ol className="lp-flow">
+                  {PROOF_STAGES.map((stage) => (
+                    <li key={stage}>{stage}</li>
+                  ))}
+                </ol>
+
+                <div className="lp-sample-evidence">
+                  <p className="lp-sample-file">
+                    <FileCheck2 aria-hidden="true" />
+                    Foundation Inspection Report.pdf
+                  </p>
+                  <dl>
+                    <div>
+                      <dt>SHA-256</dt>
+                      <dd className="font-mono">8f3a&hellip;91c2</dd>
+                    </div>
+                    <div>
+                      <dt>Verification</dt>
+                      <dd className="lp-state lp-state-positive">Match</dd>
+                    </div>
+                    <div>
+                      <dt>Blockchain</dt>
+                      <dd>Confirmed</dd>
+                    </div>
+                  </dl>
+                </div>
+              </figure>
+            </div>
+
+            <SectionImage image={SECTION_IMAGES.evidence} size="compact" />
+          </div>
         </section>
 
-        <section className="landing-section history-section" id="history">
-          <div className="section-heading"><SectionEyebrow>APPEND-ONLY PROJECT HISTORY</SectionEyebrow><h2>Project history evolves without disappearing.</h2><p>Corrections, variations and disputes become part of the history rather than silently overwriting what happened before.</p></div>
-          <ol className="history-timeline">{lifecycle.map((event, index) => <li key={event} className={index === lifecycle.length - 1 ? "is-final" : ""}><span className="timeline-node">{index === lifecycle.length - 1 ? <Check /> : String(index + 1).padStart(2, "0")}</span><span>{event}</span></li>)}</ol>
+        <section className="lp-section lp-section-alt" id="verification">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="What a result means" title="Verification Should Answer a Factual Question">
+              Does the evidence presented now match the evidence previously recorded?
+            </SectionHeading>
+
+            <ul className="lp-states">
+              {VERIFICATION_STATES.map((state) => (
+                <li key={state.name} className={`lp-state-row lp-tone-${state.tone}`}>
+                  <span className="lp-state-name">{state.name}</span>
+                  <span className="lp-state-detail">{state.detail}</span>
+                </li>
+              ))}
+            </ul>
+
+            <p className="lp-find-note">
+              These results describe a comparison of recorded evidence. They are not a judgement
+              about a contractor.
+            </p>
+          </div>
         </section>
 
-        <section className="audience-section" id="clients">
-          <div className="audience-panel client-panel"><SectionEyebrow>FOR CLIENTS &amp; PROJECT OWNERS</SectionEyebrow><h2>Built for the people responsible for projects.</h2><p className="audience-intro">Clients discover contractors, own project creation and assignment, and review the evidence submitted against project milestones.</p><div className="audience-grid">{clientActions.map(({ title, text, icon: Icon }) => <article className="audience-item" key={title}><Icon /><div><h3>{title}</h3><p>{text}</p></div></article>)}</div><Link className="text-link" to="/login">Enter the client workspace <ArrowRight /></Link></div>
-          <div className="audience-panel contractor-panel" id="contractors"><SectionEyebrow>FOR CONTRACTORS</SectionEyebrow><h2>Give completed work a verifiable history.</h2><p className="audience-intro">Contractors participate in assigned projects, submit evidence and build a structured history of completed work. Project creation remains with the client.</p><div className="audience-grid">{contractorActions.map(({ title, text, icon: Icon }) => <article className="audience-item" key={title}><Icon /><div><h3>{title}</h3><p>{text}</p></div></article>)}</div><Link className="text-link" to="/login">Enter the contractor workspace <ArrowRight /></Link></div>
+        <section className="lp-section" id="clients">
+          <div className="lp-shell">
+            <SectionHeading eyebrow="Who does what" title="Built for Clients Managing Real Projects">
+              The client owns project creation and assignment.
+            </SectionHeading>
+
+            <dl className="lp-actions">
+              {CLIENT_ACTIONS.map((action) => (
+                <div key={action.title} className="lp-action">
+                  <dt>{action.title}</dt>
+                  <dd>{action.text}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
-        <section className="public-proof-section" id="public-proof"><div className="public-proof-heading"><SectionEyebrow>PUBLIC VERIFICATION</SectionEyebrow><h2>Verify a proof without opening the entire project.</h2><p>Public verification can confirm whether a specific proof reference corresponds to recorded evidence without exposing confidential project documents.</p><Link className="landing-button button-primary" to="/verify">Verify evidence <ArrowRight /></Link></div><div className="public-proof-ui"><div className="public-proof-ui-top"><span>CONTRACTORPROOF · PUBLIC CHECK</span><span className="sample-label">SAMPLE</span></div><div className="reference-line"><span>Verification reference</span><code>CP-VER-2026-000184</code></div><div className="public-proof-data"><div><span>Status</span><strong className="public-match"><CheckCircle2 /> MATCH</strong></div><div><span>Proof</span><strong>Confirmed</strong></div><div><span>Block</span><strong>#184293</strong></div></div><p>Illustrative interface only. Live responses depend on the supplied evidence reference and actual proof state.</p></div></section>
+        <section className="lp-section lp-section-alt" id="contractors">
+          <div className="lp-shell">
+            <div className="lp-split">
+              <div className="lp-split-copy">
+                <SectionHeading eyebrow="For contractors" title="Give Completed Work a Verifiable History">
+                  Contractors receive assigned projects, document project execution and build a
+                  verifiable history of completed work.
+                </SectionHeading>
+                <ul className="lp-checks">
+                  <li>
+                    <Flag aria-hidden="true" />
+                    Work arrives as an assigned project, not an invitation to create one
+                  </li>
+                  <li>
+                    <Check aria-hidden="true" />
+                    Evidence is recorded against the milestone it belongs to
+                  </li>
+                </ul>
+              </div>
 
-        <section className="landing-section architecture-section" id="architecture"><div className="architecture-copy"><SectionEyebrow>THE TRUST MODEL</SectionEyebrow><h2>Blockchain is one layer of the system — not the whole system.</h2><p>Application records, controlled document storage and cryptographic proof each have a distinct role in the workflow.</p></div><div className="architecture-stack"><div><span>01</span><strong>USER INTERFACE</strong><small>Discovery · execution · review</small></div><ArrowDown /><div><span>02</span><strong>CONTRACTORPROOF API</strong><small>Access rules · workflow · history</small></div><div className="stack-bottom"><div><span>03</span><strong>POSTGRESQL</strong><small>System of record</small></div><div><span>04</span><strong>CONTROLLED STORAGE</strong><small>Evidence files stay off-chain</small></div><div><span>05</span><strong>BLOCKCHAIN REGISTRY</strong><small>Authorized event proof</small></div></div></div></section>
+              <ul className="lp-list-panel">
+                {CONTRACTOR_ACTIONS.map((item) => (
+                  <li key={item}>
+                    <Check aria-hidden="true" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
 
-        <section className="final-cta"><SectionEyebrow>CONTRACTORPROOF</SectionEyebrow><h2>Turn project records into verifiable history.</h2><p>Connect contractor discovery, project execution, evidence, verification and blockchain-backed proof in one auditable workflow.</p><div className="hero-actions"><Link className="landing-button button-primary" to="/login">Explore ContractorProof <ArrowRight /></Link><Link className="landing-button button-light" to="/login">Sign in</Link></div></section>
-      </div>
+        <section className="lp-section" id="public-proof">
+          <div className="lp-shell">
+            <div className="lp-split">
+              <figure className="lp-card lp-proof-card">
+                <SampleTag />
+                <dl>
+                  <div>
+                    <dt>Verification reference</dt>
+                    <dd className="font-mono">CP-VER-2026-000184</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd className="lp-state lp-state-positive">Match</dd>
+                  </div>
+                  <div>
+                    <dt>Proof</dt>
+                    <dd>Confirmed</dd>
+                  </div>
+                  <div>
+                    <dt>Block</dt>
+                    <dd className="font-mono">#184293</dd>
+                  </div>
+                </dl>
+              </figure>
 
-      <footer className="landing-footer"><a className="landing-brand" href="#top"><Mark compact /><span>ContractorProof<small>PROJECT EVIDENCE &amp; VERIFICATION</small></span></a><span>Evidence remains the record. Proof preserves its integrity.</span><div><Link to="/login">Sign in</Link><Link to="/verify">Public verification</Link></div></footer>
-    </main>
+              <div className="lp-split-copy">
+                <SectionHeading eyebrow="Public check" title="Verify a Proof">
+                  Verify a recorded proof without opening confidential project documents.
+                </SectionHeading>
+                <p>
+                  Anyone holding a recorded proof can check it against the anchored cryptographic
+                  proof. The document itself is never published to do this.
+                </p>
+                <Link className="lp-btn lp-btn-outline" to="/verify">
+                  Verify a Proof
+                  <ArrowRight aria-hidden="true" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="lp-cta">
+          <div className="lp-shell lp-cta-inner">
+            <Reveal>
+              <h2 className="lp-cta-title">
+                Know the Contractor.
+                <br />
+                Verify the Project.
+                <br />
+                Keep the Proof.
+              </h2>
+              <p className="lp-cta-lede">
+                ContractorProof connects contractor discovery, project execution, evidence,
+                verification and blockchain-backed proof in one auditable workflow.
+              </p>
+              <div className="lp-hero-actions">
+                <a className="lp-btn lp-btn-primary" href="#find">
+                  Find a Contractor
+                </a>
+                <Link className="lp-btn lp-btn-ghost-light" to="/login">
+                  Sign In
+                </Link>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+      </main>
+
+      <footer className="lp-footer">
+        <div className="lp-shell lp-footer-inner">
+          <p className="lp-footer-brand">
+            <ShieldCheck aria-hidden="true" />
+            ContractorProof
+          </p>
+          <nav className="lp-footer-nav" aria-label="Footer navigation">
+            <a href="#passport" onClick={closeMenu}>
+              Contractor Passport
+            </a>
+            <a href="#how-it-works" onClick={closeMenu}>
+              How It Works
+            </a>
+            <Link to="/verify">Verification</Link>
+            <Link to="/login">Sign In</Link>
+          </nav>
+        </div>
+      </footer>
+    </div>
   );
 }

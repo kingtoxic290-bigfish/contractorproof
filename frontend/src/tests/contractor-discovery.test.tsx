@@ -64,6 +64,28 @@ describe("contractor discovery by CRB Registration Number", () => {
     ).toBeGreaterThan(0);
   });
 
+  // The public landing page hands the number over in the URL, because this
+  // route sits behind the sign-in gate. The value is a form default only: it
+  // must not trigger a search on arrival.
+  it("prefills the CRB field from the landing page hand-off without searching", async () => {
+    renderApp("/contractors?crb=CRB%2F1234%2F2024");
+
+    const field = await screen.findByRole("textbox", {
+      name: "Search by CRB Registration Number",
+    });
+    expect(field).toHaveValue("CRB/1234/2024");
+    expect(searchContractorsByCrbRegistrationNumber).not.toHaveBeenCalled();
+  });
+
+  it("leaves the CRB field empty when no number was handed over", async () => {
+    renderApp("/contractors");
+
+    const field = await screen.findByRole("textbox", {
+      name: "Search by CRB Registration Number",
+    });
+    expect(field).toHaveValue("");
+  });
+
   it("returns the matching ContractorProof contractor for a CLIENT", async () => {
     vi.mocked(searchContractorsByCrbRegistrationNumber).mockResolvedValue([harbor]);
 

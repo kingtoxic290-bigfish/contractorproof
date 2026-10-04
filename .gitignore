@@ -10,6 +10,8 @@ coverage/
 .env
 .env.local
 .env.*.local
+.env*.backup
+*.env.backup
 frontend/.env
 backend/.env
 contracts/.env
@@ -46,3 +48,4 @@ contracts/ignition/deployments/
 
 # Local agent/task archives
 ContractorProof-task*.zip
+.neon
