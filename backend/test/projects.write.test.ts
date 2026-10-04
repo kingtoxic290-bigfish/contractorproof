@@ -2,6 +2,7 @@ import { Role } from "@prisma/client";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { app } from "../src/app";
+import { prisma } from "../src/repositories/prisma";
 import {
   cleanupQaUsers,
   privileged,
@@ -32,14 +33,16 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
     expect(created.body.data.project).toMatchObject({
       name: "Owned Project",
       description: "created over HTTP",
-      clientId: client.userId,
       clientName: "Project Client",
       contractorId: owner.contractorId,
       contractorName: "Assigned Contractor",
     });
     expect(created.body.data.project.contractorId).not.toBe(other.contractorId);
-    expect(created.body.data.project.clientId).not.toBe(other.userId);
+    expect(created.body.data.project).not.toHaveProperty("clientId");
     expect(created.body.data.project.id).toEqual(expect.any(String));
+    const persisted = await prisma.project.findUnique({ where: { id: created.body.data.project.id } });
+    expect(persisted?.clientId).toBe(client.userId);
+    expect(persisted?.clientId).not.toBe(other.userId);
   });
 
   it("returns 401 without a JWT and 400 when name is missing", async () => {
@@ -75,6 +78,21 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
     expect(missing.body.error.code).toBe("VALIDATION_ERROR");
   });
 
+  it("rejects a Contractor row whose linked user is not a CONTRACTOR", async () => {
+    const client = await registerClient("Invalid Contractor Record Owner");
+    const invalidContractor = await prisma.contractor.create({
+      data: { userId: client.userId, legalName: "Invalid Contractor Profile" },
+    });
+
+    const response = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${client.token}`)
+      .send({ name: "Invalid Assignment", contractorId: invalidContractor.id });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("CONTRACTOR_NOT_FOUND");
+  });
+
   it("lets only the owning client reassign the contractor and transfers project access", async () => {
     const client = await registerClient("Assignment Owner");
     const unrelatedClient = await registerClient("Unrelated Assignment Owner");
@@ -105,10 +123,12 @@ describe("POST /api/v1/projects and POST /api/v1/milestones", () => {
     expect(reassigned.status).toBe(200);
     expect(reassigned.body.data.project).toMatchObject({
       id: projectId,
-      clientId: client.userId,
       contractorId: replacementContractor.contractorId,
       contractorName: "Replacement Assignee",
     });
+    expect(reassigned.body.data.project).not.toHaveProperty("clientId");
+    const persisted = await prisma.project.findUnique({ where: { id: projectId } });
+    expect(persisted?.clientId).toBe(client.userId);
 
     const originalAccess = await request(app)
       .get(`/api/v1/projects/${projectId}`)
@@ -251,6 +271,12 @@ describe("project and milestone ownership / IDOR", () => {
       .send({ name: "Project A", contractorId: contractor.contractorId });
     expect(created.status).toBe(201);
     const projectId = created.body.data.project.id as string;
+    const foreignCreated = await request(app)
+      .post("/api/v1/projects")
+      .set("Authorization", `Bearer ${stranger.token}`)
+      .send({ name: "Project B", contractorId: unrelatedContractor.contractorId });
+    expect(foreignCreated.status).toBe(201);
+    const foreignProjectId = foreignCreated.body.data.project.id as string;
 
     const ownProject = await request(app)
       .get(`/api/v1/projects/${projectId}`)
@@ -272,6 +298,15 @@ describe("project and milestone ownership / IDOR", () => {
       .get(`/api/v1/projects/${projectId}`)
       .set("Authorization", `Bearer ${unrelatedContractor.token}`);
     expect(unrelatedContractorProject.status).toBe(403);
+
+    const contractorCannotReadForeignProject = await request(app)
+      .get(`/api/v1/projects/${foreignProjectId}`)
+      .set("Authorization", `Bearer ${contractor.token}`);
+    expect(contractorCannotReadForeignProject.status).toBe(403);
+    const clientCannotReadForeignProject = await request(app)
+      .get(`/api/v1/projects/${foreignProjectId}`)
+      .set("Authorization", `Bearer ${client.token}`);
+    expect(clientCannotReadForeignProject.status).toBe(403);
 
     const createdMilestone = await request(app)
       .post("/api/v1/milestones")
@@ -301,16 +336,19 @@ describe("project and milestone ownership / IDOR", () => {
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${client.token}`);
     expect(ownList.body.projects.map((row: { id: string }) => row.id)).toContain(projectId);
+    expect(ownList.body.projects.map((row: { id: string }) => row.id)).not.toContain(foreignProjectId);
 
     const strangerList = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${stranger.token}`);
+    expect(strangerList.body.projects.map((row: { id: string }) => row.id)).toContain(foreignProjectId);
     expect(strangerList.body.projects.map((row: { id: string }) => row.id)).not.toContain(projectId);
 
     const contractorList = await request(app)
       .get("/api/v1/projects")
       .set("Authorization", `Bearer ${contractor.token}`);
     expect(contractorList.body.projects.map((row: { id: string }) => row.id)).toContain(projectId);
+    expect(contractorList.body.projects.map((row: { id: string }) => row.id)).not.toContain(foreignProjectId);
 
     const clientPassports = await request(app)
       .get("/api/v1/passports")
@@ -322,7 +360,10 @@ describe("project and milestone ownership / IDOR", () => {
       .get("/api/v1/passports")
       .set("Authorization", `Bearer ${stranger.token}`);
     expect(unrelatedPassports.status).toBe(200);
-    expect(unrelatedPassports.body.data.passports).toEqual([]);
+    expect(unrelatedPassports.body.data.passports.map((row: { project: { id: string } }) => row.project.id))
+      .toContain(foreignProjectId);
+    expect(unrelatedPassports.body.data.passports.map((row: { project: { id: string } }) => row.project.id))
+      .not.toContain(projectId);
 
     const assignedPassport = await request(app)
       .get(`/api/v1/passports/${projectId}`)

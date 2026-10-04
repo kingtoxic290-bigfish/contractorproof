@@ -30,6 +30,14 @@ enum MilestoneStatus {
   REJECTED
 }
 
+enum ProjectLifecycleStatus {
+  CREATED
+  IN_PROGRESS
+  EXECUTION_COMPLETE
+  UNDER_FINAL_REVIEW
+  COMPLETED
+}
+
 enum AttestationDecision {
   APPROVED
   REJECTED
@@ -105,6 +113,8 @@ model User {
   variationReviews        ContractVariation[]    @relation("VariationReviewer")
   crbVerificationRequests CrbVerification[]      @relation("CrbVerificationRequester")
   procurementLinksCreated ProcurementLink[] @relation("ProcurementLinkActor")
+  milestoneStatusHistory MilestoneStatusHistory[]
+  projectStatusHistory ProjectStatusHistory[] @relation("ProjectStatusHistoryActor")
 }
 
 model Contractor {
@@ -112,7 +122,7 @@ model Contractor {
   userId                String    @unique
   user                  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   legalName             String
-  crbRegistrationNumber String?
+  crbRegistrationNumber String?   @unique
   crbCategory           String?
   crbType               String?
   crbClass              String?
@@ -130,7 +140,6 @@ model Contractor {
   crbVerifications CrbVerification[]
   procurementLinks ProcurementLink[]
 
-  @@index([crbRegistrationNumber])
 }
 
 /// Factual outcome of one CRB registration check. These are states of the
@@ -269,6 +278,7 @@ model Project {
   contractStartDate     DateTime?
   contractEndDate       DateTime?
   nestSource            String     @default("SYNTHETIC_DEMO")
+  lifecycleStatus       ProjectLifecycleStatus @default(CREATED)
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
 
@@ -384,6 +394,56 @@ model EvidenceVersion {
   @@index([evidenceId])
   @@index([sha256])
   @@index([createdById])
+}
+
+/// Append-only audit record for one milestone status transition or a legacy baseline.
+// Append-only execution history for a milestone.
+//
+// `milestoneId` is intentionally NOT a foreign key. History is written to
+// outlive the milestone row: when a milestone is physically removed its
+// history must remain readable and immutable. A restricting FK would forbid
+// that deletion, and a cascading one would erase the record, so the column is
+// a plain reference and the `MilestoneStatusHistory_append_only` trigger is
+// what actually protects it.
+model MilestoneStatusHistory {
+  id             String          @id @default(uuid())
+  milestoneId    String
+  sequence       Int
+  previousStatus MilestoneStatus?
+  newStatus      MilestoneStatus
+  actorId        String?
+  actor          User?           @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorName      String?
+  actorRole      Role?
+  evidenceId     String?
+  isBaseline     Boolean         @default(false)
+  reason         String?
+  createdAt      DateTime        @default(now())
+
+  @@index([milestoneId, createdAt])
+  @@index([actorId])
+  @@index([evidenceId])
+  @@unique([milestoneId, sequence])
+}
+
+/// Append-only project lifecycle record; projectId remains as a durable snapshot.
+model ProjectStatusHistory {
+  id             String                @id @default(uuid())
+  projectId      String
+  sequence       Int
+  previousStatus ProjectLifecycleStatus?
+  newStatus      ProjectLifecycleStatus
+  actorId        String?
+  actor          User?                 @relation("ProjectStatusHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName      String?
+  actorRole      Role?
+  isBaseline     Boolean               @default(false)
+  reason         String?
+  createdAt      DateTime              @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([actorId])
+  @@unique([projectId, sequence])
 }
 
 /// Append-only fingerprint compare. Not EvidenceStatus and not Attestation.

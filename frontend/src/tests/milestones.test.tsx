@@ -26,16 +26,39 @@ vi.mock("../features/milestones/api/milestonesApi", () => ({
   listProjectMilestones: vi.fn(),
   getMilestone: vi.fn(),
   createMilestone: vi.fn(),
+  listMilestoneHistory: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("../features/evidence/api/evidenceApi", () => ({
   listEvidence: vi.fn(),
 }));
 
+// The milestone detail screen reads recorded evidence versions from the stored
+// verification history. It is mocked here so the page never reaches the network.
+vi.mock("../features/verification/api/verificationHistoryApi", () => ({
+  listVerificationHistory: vi.fn(() => Promise.resolve([])),
+}));
+
+// The execution summary counts recorded review events. They are mocked here so
+// the page never reaches the network.
+vi.mock("../features/verification/api/attestationApi", () => ({
+  listAttestations: vi.fn(() => Promise.resolve([])),
+  createAttestation: vi.fn(),
+}));
+
+vi.mock("../features/corrections/api/correctionsApi", () => ({
+  listCorrections: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock("../features/disputes/api/disputesApi", () => ({
+  listDisputes: vi.fn(() => Promise.resolve([])),
+}));
+
 vi.mock("../features/projects/api/projectsApi", () => ({
   getProject: vi.fn(),
   listProjects: vi.fn(),
   createProject: vi.fn(),
+  listProjectLifecycleHistory: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("../features/contractors/api/contractorsApi", () => ({

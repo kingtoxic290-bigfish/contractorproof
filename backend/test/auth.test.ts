@@ -59,6 +59,49 @@ describe("authentication and registration", () => {
     expect(JSON.stringify(login.body)).not.toMatch(/passwordHash/i);
   });
 
+  it("normalizes CRB registration numbers and rejects invalid or duplicate values", async () => {
+    const crbNumber = "CRB-AUTH-1234";
+    const first = await request(app).post("/api/v1/auth/register").send({
+      email: uniqueEmail("crb-contractor"),
+      password: "password123",
+      fullName: "CRB Contractor",
+      role: "CONTRACTOR",
+      crbRegistrationNumber: ` ${crbNumber.toLowerCase()} `,
+    });
+    expect(first.status).toBe(201);
+    createdUserIds.push(first.body.user.id);
+
+    const contractor = await prisma.contractor.findUnique({ where: { userId: first.body.user.id } });
+    expect(contractor?.crbRegistrationNumber).toBe(crbNumber);
+
+    const duplicate = await request(app).post("/api/v1/auth/register").send({
+      email: uniqueEmail("duplicate-crb"),
+      password: "password123",
+      fullName: "Duplicate CRB Contractor",
+      role: "CONTRACTOR",
+      crbRegistrationNumber: crbNumber.toLowerCase(),
+    });
+    expect(duplicate.status).toBe(409);
+
+    const invalid = await request(app).post("/api/v1/auth/register").send({
+      email: uniqueEmail("invalid-crb"),
+      password: "password123",
+      fullName: "Invalid CRB Contractor",
+      role: "CONTRACTOR",
+      crbRegistrationNumber: "CRB-INVALID!",
+    });
+    expect(invalid.status).toBe(400);
+
+    const clientWithCrb = await request(app).post("/api/v1/auth/register").send({
+      email: uniqueEmail("client-crb"),
+      password: "password123",
+      fullName: "Client With CRB",
+      role: "CLIENT",
+      crbRegistrationNumber: "CRB-CLIENT-1",
+    });
+    expect(clientWithCrb.status).toBe(400);
+  });
+
   it("rejects privileged public registration roles", async () => {
     for (const role of ["ADMIN", "AUDITOR", "PROCUREMENT_OFFICER", "CONSULTANT_ENGINEER"]) {
       const email = uniqueEmail(role.toLowerCase());

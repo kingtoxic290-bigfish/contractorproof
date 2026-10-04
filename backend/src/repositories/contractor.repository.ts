@@ -40,6 +40,13 @@ export const contractorRepository = {
     });
   },
 
+  findByCrbRegistrationNumber(crbRegistrationNumber: string): Promise<ContractorWithPublicUser | null> {
+    return prisma.contractor.findFirst({
+      where: { crbRegistrationNumber: { equals: crbRegistrationNumber, mode: "insensitive" } },
+      ...contractorWithPublicUser,
+    });
+  },
+
   findAccessible(where: Prisma.ContractorWhereInput): Promise<ContractorWithPublicUser[]> {
     return prisma.contractor.findMany({
       where,

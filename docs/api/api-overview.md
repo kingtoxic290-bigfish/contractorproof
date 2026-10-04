@@ -1,7 +1,7 @@
 # API Overview
 
-Status: frozen by Agent 0 (2026-09-24)  
-Detail: [contracts.md](contracts.md)  
+Status: historical Stage 2 snapshot (2026-09-24), superseded by the [current API contract](../API.md). The status matrix below records that earlier phase and is not current implementation guidance.\
+Detail: [historical contracts](contracts.md)\
 Decision: [ADR-0004](../architecture/adr/ADR-0004-api-versioning.md)
 
 ## Base

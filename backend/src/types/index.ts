@@ -1,4 +1,4 @@
-import type { MilestoneStatus, Role } from "@prisma/client";
+import type { MilestoneStatus, ProjectLifecycleStatus, Role } from "@prisma/client";
 
 export type PublicUser = {
   id: string;
@@ -9,7 +9,6 @@ export type PublicUser = {
 
 export type PublicContractor = {
   id: string;
-  userId: string;
   legalName: string;
   crbRegistrationNumber: string | null;
   crbCategory: string | null;
@@ -21,15 +20,16 @@ export type PublicContractor = {
   crbSource: string | null;
   createdAt: string;
   updatedAt: string;
-  user: PublicUser;
 };
 
 export type PublicProject = {
   id: string;
-  clientId: string | null;
+  lifecycleStatus: ProjectLifecycleStatus;
   clientName: string | null;
   contractorId: string;
   contractorName: string;
+  /** Identity of the assigned contractor, for the CLIENT's assignment view. */
+  contractorCrbRegistrationNumber: string | null;
   name: string;
   description: string | null;
   nestTenderReference: string | null;

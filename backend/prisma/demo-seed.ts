@@ -109,7 +109,7 @@ async function provisionPrivileged(input: {
 
 async function removePreviousDemoData(): Promise<void> {
   const users = await prisma.user.findMany({
-    where: { email: { endsWith: "@contractorproof.test" } },
+    where: { email: { in: Object.values(ACCOUNTS).map((account) => account.email) } },
     select: { id: true },
   });
   const ids = users.map((user) => user.id);
@@ -157,12 +157,23 @@ async function removePreviousDemoData(): Promise<void> {
     await prisma.evidence.deleteMany({ where: { id: { in: evidenceIds } } });
   }
 
-  await prisma.blockchainEvent.deleteMany({
-    where: { project: { contractor: demoContractors } },
-  });
-  await prisma.milestone.deleteMany({ where: { project: { contractor: demoContractors } } });
-  await prisma.verificationPolicy.deleteMany({ where: { project: { contractor: demoContractors } } });
-  await prisma.project.deleteMany({ where: { contractor: demoContractors } });
+  // A project belongs to the demo dataset when a demo account is either its
+  // contractor or its owning client. Matching only on the contractor leaves
+  // client-owned demo projects behind, and deleting the user then fails on
+  // Project.clientId.
+  const demoProjects = {
+    OR: [{ contractor: demoContractors }, { clientId: { in: ids } }],
+  };
+
+  // Procurement links are keyed to a contractor, not to a project, and use
+  // ON DELETE RESTRICT. The demo links one sandbox record to the demo
+  // contractor, so they have to go before the contractor row does.
+  await prisma.procurementLink.deleteMany({ where: { contractor: demoContractors } });
+
+  await prisma.blockchainEvent.deleteMany({ where: { project: demoProjects } });
+  await prisma.milestone.deleteMany({ where: { project: demoProjects } });
+  await prisma.verificationPolicy.deleteMany({ where: { project: demoProjects } });
+  await prisma.project.deleteMany({ where: demoProjects });
   await prisma.contractor.deleteMany({ where: { userId: { in: ids } } });
   await prisma.auditLog.deleteMany({ where: { userId: { in: ids } } });
   await prisma.user.deleteMany({ where: { id: { in: ids } } });
@@ -185,12 +196,22 @@ async function main(): Promise<void> {
 
 
   // CLIENT creates the project and assigns the contractor in one request.
-  const contractors = payloadOf(await api("get", "/contractors", client.token));
-  const contractorRecords = (contractors.contractors ?? []) as { id: string }[];
-  if (contractorRecords.length === 0) {
+  // Resolve the demo contractor from the account this run just registered.
+  //
+  // This used to take `GET /contractors[0]`, which is only correct when the
+  // demo contractor is the only contractor in the database. Any leftover record
+  // — from an earlier seed, a manual demo, or another test run — can be
+  // returned first, and the seed then hands CRB-DEMO-001 and the demo project
+  // to that unrelated contractor while the real demo contractor is left without
+  // a CRB reference and cannot upload evidence to the project it does not own.
+  const demoContractor = await prisma.contractor.findUnique({
+    where: { userId: contractor.userId },
+    select: { id: true },
+  });
+  if (!demoContractor) {
     throw new Error("expected the registered contractor profile");
   }
-  const contractorId = contractorRecords[0].id;
+  const contractorId = demoContractor.id;
 
   const projectResponse = payloadOf(
     await api("post", "/projects", client.token, {

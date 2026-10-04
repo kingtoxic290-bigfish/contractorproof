@@ -13,7 +13,7 @@ export function ContractorDetailPage() {
     <section className="space-y-6">
       <PageHeader
         title="Contractor"
-        description="Contractor identity and registration fields. Open the Passports section to review project evidence history associated with this contractor."
+        description="Contractor identity and registration fields. Open the live Contractor Passport to review the project history recorded for this contractor."
       />
       <p>
         <Link
@@ -35,16 +35,24 @@ export function ContractorDetailPage() {
           </Card>
         ) : null}
       </QueryPanel>
-      <Card title="Associated projects" description="Project evidence history for this contractor is available through the Passport section.">
+      <Card title="Contractor Passport" description="The live Contractor Passport presents this contractor's recorded identity, project history, milestones, evaluations and proof. It contains no rating or recommendation.">
         <p className="text-sm text-stone-600">
-          Passports show project milestones, evidence records, verification outcomes, and blockchain proof events authorized for your account.
+          Open the passport, then select this contractor from there.
+        </p>
+        <p className="mt-3">
+          <Link
+            to={`/contractors/${encodeURIComponent(contractorId ?? "")}/passport`}
+            className="text-sm font-semibold text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+          >
+            Open Contractor Passport
+          </Link>
         </p>
         <p className="mt-3">
           <Link
             to="/passports"
             className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
           >
-            View Contractor Passports
+            View project Passports
           </Link>
         </p>
       </Card>

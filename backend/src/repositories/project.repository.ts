@@ -1,9 +1,12 @@
-import type { Milestone, Prisma, VerificationPolicy } from "@prisma/client";
+import type { Milestone, Prisma, ProjectLifecycleStatus, Role, VerificationPolicy } from "@prisma/client";
 import { prisma } from "./prisma";
+import { RepositoryError } from "./errors";
 
 const projectPublicInclude = {
   client: { select: { id: true, fullName: true } },
-  contractor: { select: { id: true, legalName: true } },
+  // crbRegistrationNumber is the discovery identity a CLIENT already sees on
+  // the contractor list and passport, so projecting it here exposes nothing new.
+  contractor: { select: { id: true, legalName: true, crbRegistrationNumber: true } },
 } satisfies Prisma.ProjectInclude;
 
 export type ProjectWithRelations = Prisma.ProjectGetPayload<{
@@ -13,6 +16,9 @@ export type ProjectWithRelations = Prisma.ProjectGetPayload<{
 export type CreateProjectInput = {
   clientId?: string | null;
   contractorId: string;
+  actorId: string;
+  actorName: string;
+  actorRole: Role;
   name: string;
   description?: string | null;
   nestTenderReference?: string | null;
@@ -27,6 +33,9 @@ export type CreateProjectInput = {
 export type CreateMilestoneInput = {
   projectId: string;
   name: string;
+  actorId: string;
+  actorName: string;
+  actorRole: Role;
   description?: string | null;
   policyId?: string | null;
 };
@@ -62,21 +71,39 @@ export const projectRepository = {
   },
 
   createProject(input: CreateProjectInput): Promise<ProjectWithRelations> {
-    return prisma.project.create({
-      data: {
-        clientId: input.clientId ?? null,
-        contractorId: input.contractorId,
-        name: input.name,
-        description: input.description ?? null,
-        nestTenderReference: input.nestTenderReference ?? null,
-        nestContractReference: input.nestContractReference ?? null,
-        ocid: input.ocid ?? null,
-        procuringEntity: input.procuringEntity ?? null,
-        contractStatus: input.contractStatus ?? null,
-        contractStartDate: input.contractStartDate ?? null,
-        contractEndDate: input.contractEndDate ?? null,
-      },
-      include: projectPublicInclude,
+    return prisma.$transaction(async (tx) => {
+      const project = await tx.project.create({
+        data: {
+          clientId: input.clientId ?? null,
+          contractorId: input.contractorId,
+          name: input.name,
+          description: input.description ?? null,
+          nestTenderReference: input.nestTenderReference ?? null,
+          nestContractReference: input.nestContractReference ?? null,
+          ocid: input.ocid ?? null,
+          procuringEntity: input.procuringEntity ?? null,
+          contractStatus: input.contractStatus ?? null,
+          contractStartDate: input.contractStartDate ?? null,
+          contractEndDate: input.contractEndDate ?? null,
+        },
+      });
+      await tx.projectStatusHistory.create({
+        data: {
+          projectId: project.id,
+          sequence: 0,
+          previousStatus: null,
+          newStatus: project.lifecycleStatus,
+          actorId: input.actorId,
+          actorName: input.actorName,
+          actorRole: input.actorRole,
+          isBaseline: true,
+          createdAt: project.createdAt,
+        },
+      });
+      return tx.project.findUniqueOrThrow({
+        where: { id: project.id },
+        include: projectPublicInclude,
+      });
     });
   },
 
@@ -101,6 +128,13 @@ export const projectRepository = {
     });
   },
 
+  listMilestoneStatusHistory(milestoneId: string) {
+    return prisma.milestoneStatusHistory.findMany({
+      where: { milestoneId },
+      orderBy: [{ sequence: "asc" }],
+    });
+  },
+
   getPolicyById(id: string): Promise<VerificationPolicy | null> {
     return prisma.verificationPolicy.findUnique({
       where: { id },
@@ -108,13 +142,38 @@ export const projectRepository = {
   },
 
   createMilestone(input: CreateMilestoneInput): Promise<Milestone> {
-    return prisma.milestone.create({
-      data: {
-        projectId: input.projectId,
-        name: input.name,
-        description: input.description ?? null,
-        policyId: input.policyId ?? null,
-      },
+    return prisma.$transaction(async (tx) => {
+      const lockedProject = await tx.$queryRaw<Array<{ lifecycleStatus: ProjectLifecycleStatus }>>`
+        SELECT "lifecycleStatus" FROM "Project" WHERE "id" = ${input.projectId} FOR UPDATE
+      `;
+      if (lockedProject.length === 0) {
+        throw new RepositoryError("project not found");
+      }
+      if (lockedProject[0].lifecycleStatus !== "CREATED") {
+        throw new RepositoryError("milestones cannot be added after project execution starts");
+      }
+      const milestone = await tx.milestone.create({
+        data: {
+          projectId: input.projectId,
+          name: input.name,
+          description: input.description ?? null,
+          policyId: input.policyId ?? null,
+        },
+      });
+      await tx.milestoneStatusHistory.create({
+        data: {
+          milestoneId: milestone.id,
+          sequence: 0,
+          previousStatus: null,
+          newStatus: milestone.status,
+          actorId: input.actorId,
+          actorName: input.actorName,
+          actorRole: input.actorRole,
+          isBaseline: true,
+          createdAt: milestone.createdAt,
+        },
+      });
+      return milestone;
     });
   },
 };

@@ -3,6 +3,7 @@ import { ApiError } from "../http/errors";
 import { HttpError } from "../middleware/errorHandler";
 import { contractorRepository } from "../repositories/contractor.repository";
 import { projectRepository, type ProjectWithRelations } from "../repositories/project.repository";
+import { RepositoryError } from "../repositories/errors";
 import { assertCanManageProject, assertCanWriteProject } from "./access.service";
 import type { PublicMilestone, PublicProject, PublicUser } from "../types";
 
@@ -45,10 +46,11 @@ function toIsoString(value: Date | null): string | null {
 function toPublicProject(row: ProjectWithRelations): PublicProject {
   return {
     id: row.id,
-    clientId: row.clientId,
+    lifecycleStatus: row.lifecycleStatus,
     clientName: row.client?.fullName ?? null,
     contractorId: row.contractorId,
     contractorName: row.contractor.legalName,
+    contractorCrbRegistrationNumber: row.contractor.crbRegistrationNumber,
     name: row.name,
     description: row.description,
     nestTenderReference: row.nestTenderReference,
@@ -144,13 +146,16 @@ export const projectService = {
       throw new ApiError(400, "VALIDATION_ERROR", "contractorId must be a valid UUID");
     }
     const contractor = await contractorRepository.getContractorById(suppliedContractorId);
-    if (!contractor) {
+    if (!contractor || contractor.user.role !== Role.CONTRACTOR) {
       throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
     }
 
     const row = await projectRepository.createProject({
       clientId: actor.role === Role.CLIENT ? actor.id : null,
       contractorId: contractor.id,
+      actorId: actor.id,
+      actorName: actor.fullName,
+      actorRole: actor.role,
       name,
       description: optionalTrimmed(input.description) ?? null,
       nestTenderReference: optionalTrimmed(input.nestTenderReference) ?? null,
@@ -198,12 +203,23 @@ export const projectService = {
       }
     }
 
-    const row = await projectRepository.createMilestone({
-      projectId,
-      name,
-      description: optionalTrimmed(input.description) ?? null,
-      policyId: policyId ?? null,
-    });
+    let row: Milestone;
+    try {
+      row = await projectRepository.createMilestone({
+        projectId,
+        name,
+        actorId: actor.id,
+        actorName: actor.fullName,
+        actorRole: actor.role,
+        description: optionalTrimmed(input.description) ?? null,
+        policyId: policyId ?? null,
+      });
+    } catch (error) {
+      if (error instanceof RepositoryError && error.message === "milestones cannot be added after project execution starts") {
+        throw new ApiError(409, "CONFLICT", error.message);
+      }
+      throw error;
+    }
     return toPublicMilestone(row);
   },
 
@@ -219,7 +235,7 @@ export const projectService = {
       throw new ApiError(400, "VALIDATION_ERROR", "contractorId must be a valid UUID");
     }
     const contractor = await contractorRepository.getContractorById(contractorId);
-    if (!contractor) {
+    if (!contractor || contractor.user.role !== Role.CONTRACTOR) {
       throw new ApiError(404, "CONTRACTOR_NOT_FOUND", "contractor not found");
     }
     const updated = await projectRepository.updateProjectContractor(id, contractor.id);

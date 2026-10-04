@@ -1,6 +1,10 @@
 import { apiRequest } from "../../../services/api/client";
 import { isPlainRecord, unwrapNamedList, unwrapNamedRecord } from "../../shared/query";
 import { parsePublicMilestone, type PublicMilestone } from "../types";
+import {
+  parseMilestoneStatusHistoryEntry,
+  type MilestoneStatusHistoryEntry,
+} from "../types";
 
 export type MilestoneCreateInput = {
   name: string;
@@ -34,6 +38,71 @@ export async function getMilestone(milestoneId: string): Promise<PublicMilestone
     throw new Error("The milestone response is not in a known format.");
   }
   return milestone;
+}
+
+/**
+ * Append-only milestone status history, oldest first.
+ *
+ * This is the record of how a milestone reached its current status. It is not a
+ * progress percentage and not a judgement about the contractor.
+ */
+export async function listMilestoneHistory(
+  milestoneId: string,
+): Promise<MilestoneStatusHistoryEntry[]> {
+  const payload = await apiRequest<unknown>(
+    `/milestones/${encodeURIComponent(milestoneId)}/history`,
+  );
+  const records = unwrapNamedList(payload, "history");
+  if (!records) {
+    throw new Error("The milestone history response is not in a known format.");
+  }
+
+  const history = records
+    .map(parseMilestoneStatusHistoryEntry)
+    .filter((record): record is MilestoneStatusHistoryEntry => record !== null);
+  if (history.length !== records.length) {
+    throw new Error("The milestone history response is not in a known format.");
+  }
+  return history;
+}
+
+export type MilestoneTransitionInput = {
+  status: string;
+  evidenceId?: string;
+  reason?: string;
+};
+
+/**
+ * Record one milestone status transition.
+ *
+ * The server decides which transitions are legal and who may make them: a
+ * CONTRACTOR may submit progress but is never allowed to approve, and the
+ * approval step additionally requires the attestations its verification policy
+ * demands. The UI never assumes a transition is permitted.
+ */
+export async function transitionMilestone(
+  milestoneId: string,
+  input: MilestoneTransitionInput,
+): Promise<{ milestone: PublicMilestone; historyEntry: MilestoneStatusHistoryEntry }> {
+  const payload = await apiRequest<unknown>(
+    `/milestones/${encodeURIComponent(milestoneId)}/transitions`,
+    {
+      method: "POST",
+      body: {
+        status: input.status,
+        ...(input.evidenceId ? { evidenceId: input.evidenceId } : {}),
+        ...(input.reason ? { reason: input.reason } : {}),
+      },
+    },
+  );
+
+  const data = isPlainRecord(payload) && isPlainRecord(payload.data) ? payload.data : null;
+  const milestone = data ? parsePublicMilestone(data.milestone) : null;
+  const historyEntry = data ? parseMilestoneStatusHistoryEntry(data.historyEntry) : null;
+  if (!milestone || !historyEntry) {
+    throw new Error("The milestone transition response is not in a known format.");
+  }
+  return { milestone, historyEntry };
 }
 
 export async function createMilestone(

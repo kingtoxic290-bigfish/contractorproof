@@ -1,7 +1,7 @@
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { QueryPanel } from "../../shared/QueryPanel";
 import { ContractorList } from "../components/ContractorList";
-import { CrbLookupForm } from "../components/CrbLookupForm";
+import { ContractorDiscoveryForm } from "../components/ContractorDiscoveryForm";
 import { useContractors } from "../hooks/useContractors";
 
 export function ContractorsPage() {
@@ -11,8 +11,9 @@ export function ContractorsPage() {
     <section className="space-y-6">
       <PageHeader
         title="Contractors"
-        description="Registered contractor records. This screen does not calculate a trust score or performance rating."
+        description="Find a contractor by CRB Registration Number and review their Contractor Passport. ContractorProof does not replace or verify CRB registration, and it does not calculate a trust score or performance rating."
       />
+      <ContractorDiscoveryForm />
       <QueryPanel
         status={status}
         error={error}
@@ -23,7 +24,6 @@ export function ContractorsPage() {
       >
         <ContractorList records={records} />
       </QueryPanel>
-      <CrbLookupForm />
     </section>
   );
 }

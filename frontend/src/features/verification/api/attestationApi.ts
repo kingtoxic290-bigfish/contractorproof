@@ -1,5 +1,5 @@
 import { apiRequest } from "../../../services/api/client";
-import { isPlainRecord } from "../../shared/query";
+import { isPlainRecord, unwrapNamedList } from "../../shared/query";
 import { parsePublicAttestation, type AttestationDecision, type PublicAttestation } from "../types";
 
 function unwrapAttestationData(payload: unknown): unknown {
@@ -29,4 +29,37 @@ export async function createAttestation(input: {
     throw new Error("The attestation response is not in a known format.");
   }
   return record;
+}
+
+/**
+ * Client review decisions recorded against a milestone's evidence.
+ *
+ * An approval means the client reviewed this submission and approved it. It is
+ * not a statement about the contractor's trustworthiness and is never aggregated
+ * into a score.
+ */
+export async function listAttestations(filters: {
+  milestoneId?: string;
+  projectId?: string;
+  evidenceId?: string;
+}): Promise<PublicAttestation[]> {
+  const params = new URLSearchParams();
+  if (filters.milestoneId) params.set("milestoneId", filters.milestoneId);
+  if (filters.projectId) params.set("projectId", filters.projectId);
+  if (filters.evidenceId) params.set("evidenceId", filters.evidenceId);
+  const query = params.toString();
+
+  const payload = await apiRequest<unknown>(`/attestations${query ? `?${query}` : ""}`);
+  const records = unwrapNamedList(payload, "attestations");
+  if (!records) {
+    throw new Error("The attestation list response is not in a known format.");
+  }
+
+  const attestations = records
+    .map(parsePublicAttestation)
+    .filter((record): record is PublicAttestation => record !== null);
+  if (attestations.length !== records.length) {
+    throw new Error("The attestation list response is not in a known format.");
+  }
+  return attestations;
 }

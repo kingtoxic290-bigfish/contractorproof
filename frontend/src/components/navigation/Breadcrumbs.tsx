@@ -22,7 +22,7 @@ const SECTION_LABELS: Record<string, string> = {
   milestones: "Milestones",
   evidence: "Evidence",
   verification: "Verification",
-  passports: "Contractor Passports",
+  passports: "Project Passports",
   disputes: "Disputes",
   corrections: "Corrections",
   variations: "Contract variations",

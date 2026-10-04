@@ -16,7 +16,7 @@ export function ProjectsPage() {
   const isReviewer = hasRole("AUDITOR", "PROCUREMENT_OFFICER");
 
   const emptyTitle = isContractor
-    ? "No projects assigned."
+    ? "No projects assigned to you yet."
     : isClient
       ? "No projects yet."
       : isReviewer
@@ -33,7 +33,7 @@ export function ProjectsPage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title={isContractor ? "My Projects" : "Projects"}
+        title={isContractor ? "My Assigned Projects" : "Projects"}
         description={isContractor
           ? "These are projects assigned to you. Open a project to review its milestones and submit evidence."
           : isClient

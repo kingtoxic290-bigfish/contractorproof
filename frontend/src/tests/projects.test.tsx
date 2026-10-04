@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listProjectMilestones } from "../features/milestones/api/milestonesApi";
@@ -23,6 +23,7 @@ vi.mock("../features/projects/api/projectsApi", () => ({
   getProject: vi.fn(),
   createProject: vi.fn(),
   assignProjectContractor: vi.fn(),
+  listProjectLifecycleHistory: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("../features/milestones/api/milestonesApi", () => ({
@@ -40,6 +41,22 @@ vi.mock("../features/evidence/api/evidenceApi", () => ({
 
 vi.mock("../features/evidence/hooks/useEvidence", () => ({
   useEvidence: vi.fn(() => ({ status: "success", records: [], error: null, retry: vi.fn() })),
+}));
+
+// The milestone execution summary counts recorded review events, and the
+// lifecycle panel reads recorded lifecycle transitions. They are mocked here so
+// the project page never reaches the network.
+vi.mock("../features/verification/api/attestationApi", () => ({
+  listAttestations: vi.fn(() => Promise.resolve([])),
+  createAttestation: vi.fn(),
+}));
+
+vi.mock("../features/corrections/api/correctionsApi", () => ({
+  listCorrections: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock("../features/disputes/api/disputesApi", () => ({
+  listDisputes: vi.fn(() => Promise.resolve([])),
 }));
 
 const bridge = projectRecord({
@@ -172,9 +189,15 @@ describe("projects", () => {
     ]);
     renderApp("/projects/11111111-1111-4111-8111-111111111111");
     expect((await screen.findAllByText("Foundation")).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("FAILED").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
-    expect(screen.queryByText("Complete")).not.toBeInTheDocument();
+    // Scoped to this milestone's own card. Elsewhere on the page the lifecycle
+    // panel labels its execution-readiness counts, which legitimately uses the
+    // word "Verified" without describing this milestone.
+    const milestone = (await screen.findAllByText("Foundation"))[0].closest("li");
+    expect(milestone).not.toBeNull();
+    const card = within(milestone as HTMLElement);
+    expect(card.getAllByText("FAILED").length).toBeGreaterThan(0);
+    expect(card.queryByText("Verified")).not.toBeInTheDocument();
+    expect(card.queryByText("Complete")).not.toBeInTheDocument();
   });
 
   it("creates a project from the backend-backed form", async () => {
@@ -195,7 +218,7 @@ describe("projects", () => {
     await screen.findByLabelText("Project name");
     await user.type(screen.getByLabelText("Project name"), "New bridge");
     await user.type(screen.getByLabelText("Description"), "Bridge description");
-    await user.selectOptions(screen.getByLabelText("Assign contractor"), "contractor-1");
+    await user.selectOptions(screen.getByLabelText("Assigned Contractor"), "contractor-1");
     await user.click(screen.getByRole("button", { name: "Create Project and Assign Contractor" }));
 
     expect(await screen.findByText("Project created and assigned to Harbor Works Ltd.")).toBeInTheDocument();
@@ -231,7 +254,7 @@ describe("projects", () => {
     });
     renderApp("/projects");
 
-    expect(await screen.findByRole("heading", { name: "My Projects" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My Assigned Projects" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "New project" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Create Project" })).not.toBeInTheDocument();
   });

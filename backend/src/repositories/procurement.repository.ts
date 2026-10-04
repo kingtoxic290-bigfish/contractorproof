@@ -22,7 +22,14 @@ export const procurementRepository = {
           sourceRecordId: lookup.sourceRecordId,
           sourceUrl: lookup.sourceReference,
         },
-        update: {},
+        update: {
+          sourceRecordId: lookup.sourceRecordId,
+          sourceUrl: lookup.sourceReference,
+        },
+      });
+
+      await tx.procurementObservation.deleteMany({
+        where: { procurementRecordId: record.id },
       });
 
       for (const observation of lookup.observations) {

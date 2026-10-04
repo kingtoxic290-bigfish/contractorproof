@@ -726,6 +726,8 @@ describe("correction review, resolution, and history", () => {
     expect(correction.correctedEvidence.id).toBe(item.correctedEvidenceId);
     expect(correction.correctedEvidence.versions).toHaveLength(1);
     expect(correction.resolutions[0].correctedEvidenceVersion).toMatchObject({ id: item.correctedVersion.id, sha256: item.correctedHash });
+    expect(correction.resolutions[0]).not.toHaveProperty("resolvedById");
+    expect(correction.resolutions[0].resolvedByRole).toBe("ADMIN");
     expect(correction.correctionProof).toMatchObject({ txHash: `0x${"b".repeat(64)}`, confirmed: true });
     expect(correction.correctedEvidence.versions[0]).toMatchObject({ id: item.correctedVersion.id, sha256: item.correctedHash });
   });

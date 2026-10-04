@@ -1,4 +1,10 @@
-import { BlockchainEventType, Role, VariationStatus, type Prisma } from "@prisma/client";
+import {
+  BlockchainEventType,
+  MilestoneStatus,
+  Role,
+  VariationStatus,
+  type Prisma,
+} from "@prisma/client";
 import { ApiError } from "../http/errors";
 import { prisma } from "../repositories/prisma";
 import { assertCanReadProject, assertCanWriteProject, projectListWhere } from "./access.service";
@@ -61,6 +67,21 @@ function validateChanges(input: unknown): { project: Record<string, unknown>; mi
 
 function jsonSafe(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
+}
+
+/**
+ * Current milestone status, read inside the resolution transaction so the
+ * appended history row records the status that was actually replaced.
+ */
+async function currentMilestoneStatus(
+  tx: Prisma.TransactionClient,
+  milestoneId: string,
+): Promise<MilestoneStatus> {
+  const milestone = await tx.milestone.findUnique({
+    where: { id: milestoneId },
+    select: { status: true },
+  });
+  return milestone?.status ?? MilestoneStatus.PENDING;
 }
 
 async function load(id: string): Promise<VariationRecord> {
@@ -189,7 +210,37 @@ export const variationService = {
             const milestoneChanges = proposed.milestone;
             if (milestoneChanges && current.milestoneId) {
               const { id: _milestoneId, ...data } = milestoneChanges;
-              await tx.milestone.update({ where: { id: current.milestoneId }, data: data as Prisma.MilestoneUpdateInput });
+              // A variation may carry a milestone status change. When it does,
+              // the transition is appended to the same append-only
+              // MilestoneStatusHistory in this transaction, so approved history
+              // can never change a milestone status without leaving a record.
+              const previousStatus = await currentMilestoneStatus(tx, current.milestoneId);
+              const changesStatus = typeof data.status === "string" && data.status !== previousStatus;
+              const updated = await tx.milestone.update({
+                where: { id: current.milestoneId },
+                data: data as Prisma.MilestoneUpdateInput,
+              });
+              // No artificial entry when the variation did not change the status.
+              if (changesStatus) {
+                // The same per-milestone ordering the transition service uses, so
+                // a variation-driven change lands in one continuous sequence.
+                const latest = await tx.milestoneStatusHistory.findFirst({
+                  where: { milestoneId: updated.id },
+                  orderBy: { sequence: "desc" },
+                  select: { sequence: true },
+                });
+                await tx.milestoneStatusHistory.create({
+                  data: {
+                    milestoneId: updated.id,
+                    sequence: (latest?.sequence ?? -1) + 1,
+                    previousStatus,
+                    newStatus: updated.status,
+                    actorName: input.actor.fullName,
+                    actorRole: input.actor.role,
+                    reason: `Approved contract variation ${current.variationReference}: ${decision}`,
+                  },
+                });
+              }
             }
           }
           const created = await tx.variationResolution.create({ data: { variationId: current.id, status: input.status, decision, note, resolvedById: input.actor.id }, include: { resolvedBy: { select: { id: true, role: true } } } });

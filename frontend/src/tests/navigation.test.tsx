@@ -58,7 +58,9 @@ describe("navigation", () => {
 
     expect(await screen.findByRole("heading", { name: "Contractor Work Dashboard" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Audit trail/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /My Projects/i })).toBeInTheDocument();
+    // Contractor navigation names the same scope as the projects page: assigned
+    // work, not ownership.
+    expect(screen.getByRole("link", { name: /My Assigned Projects/i })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Create Project/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /^Contractors/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Verification/i })).not.toBeInTheDocument();

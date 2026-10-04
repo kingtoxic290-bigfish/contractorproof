@@ -13,7 +13,7 @@ export function PassportsPage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Contractor Passports"
+        title="Project Passports"
         description="Derived project evidence records from the authorized Passport projection. These records are not ratings or assessments."
         icon={ContactRound}
       />
@@ -21,7 +21,7 @@ export function PassportsPage() {
         status={status}
         error={official.error}
         onRetry={() => void official.retry()}
-        loadingMessage="Loading contractor passports..."
+        loadingMessage="Loading project passports..."
         emptyTitle="No passport records available."
         emptyDescription="No passport records were found for this account."
       >

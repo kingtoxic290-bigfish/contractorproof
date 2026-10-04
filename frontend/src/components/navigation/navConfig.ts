@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Building2,
+  ContactRound,
   FilePlus2,
   FileCheck,
   FilePenLine,
@@ -25,7 +26,8 @@ export type NavItem = {
 
 export const APP_NAV: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", hint: "Workspace overview", icon: LayoutDashboard },
-  { to: "/contractors", label: "Contractors", hint: "Eligible contractor records", roles: ["CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Users },
+  { to: "/contractors", label: "Contractors", hint: "Search contractors by CRB Registration Number", roles: ["CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Users },
+  { to: "/contractors/me/passport", label: "My Contractor Passport", hint: "Your recorded identity and history", roles: ["CONTRACTOR"], icon: ContactRound },
   { to: "/projects", label: "Projects", hint: "Project records", roles: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Building2 },
   { to: "/projects/new", label: "Create Project", hint: "Create and assign a project", roles: ["CLIENT", "ADMIN"], icon: FilePlus2 },
   { to: "/milestones", label: "Milestones", hint: "Assigned project milestones", roles: ["CONTRACTOR", "CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: Flag },
@@ -37,7 +39,7 @@ export const APP_NAV: NavItem[] = [
     roles: ["CLIENT", "PROCUREMENT_OFFICER", "AUDITOR", "ADMIN"],
     icon: ShieldCheck,
   },
-  { to: "/passports", label: "Passports", hint: "Project evidence history", roles: ["CLIENT", "CONTRACTOR", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: FolderKanban },
+  { to: "/passports", label: "Project Passports", hint: "Project evidence history", roles: ["CLIENT", "CONTRACTOR", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER"], icon: FolderKanban },
   { to: "/corrections", label: "Corrections", hint: "Human review corrections", roles: CORRECTION_PAGE_ROLES, icon: FilePenLine },
   { to: "/disputes", label: "Disputes", hint: "Raised disagreements", roles: DISPUTE_PAGE_ROLES, icon: Gavel },
 ];
@@ -45,12 +47,13 @@ export const APP_NAV: NavItem[] = [
 export const PAGE_TITLES: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/contractors": "Contractors",
+  "/contractors/me/passport": "My Contractor Passport",
   "/projects": "Projects",
   "/projects/new": "Create Project",
   "/milestones": "Milestones",
   "/evidence": "Evidence",
   "/verification": "Verification",
-  "/passports": "Contractor Passports",
+  "/passports": "Project Passports",
   "/disputes": "Disputes",
   "/corrections": "Corrections",
   "/variations": "Variations",
@@ -65,10 +68,10 @@ export function visibleNavItems(role: Role | undefined): NavItem[] {
   }
   return APP_NAV.filter((item) => item.roles?.includes(role)).map((item) => {
     if (item.to === "/projects" && role === "CONTRACTOR") {
-      return { ...item, label: "My Projects", hint: "Projects assigned to you" };
+      return { ...item, label: "My Assigned Projects", hint: "Projects assigned to you" };
     }
     if (item.to === "/passports" && role === "CONTRACTOR") {
-      return { ...item, label: "My Passport", hint: "Your assigned project records" };
+      return { ...item, label: "My Project Passports", hint: "Project records assigned to you" };
     }
     return item;
   });

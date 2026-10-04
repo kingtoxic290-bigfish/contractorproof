@@ -4,36 +4,29 @@ This file is the Agent 1 task ledger. Update it after every task. Use only COMPL
 
 ## CURRENT TASK
 
-TASK 12 — MVP Role-Based UI and Workflow Alignment
+PHASE 6 — FINAL RELEASE HARDENING & PRESENTATION FREEZE
 
 ## STATUS
 
-COMPLETE
+PASS WITH GAP (2026-10-04)
 
-The frontend role surface now matches the reachable existing API permissions. CLIENT sees project management and assignment but not technical verification. CONTRACTOR sees assigned-work navigation and no project creation, assignment, or technical verification actions. AUDITOR and PROCUREMENT_OFFICER can reach the authorized verification workflow. ADMIN retains the existing project and reviewer surfaces. Public users remain in the separate public verification layout.
+The current API contract is [docs/API.md](API.md). The phase entries below are historical implementation snapshots; their old test counts and scaffold-era limitations are not current release results.
 
-Public registration offers only CLIENT and CONTRACTOR. CONSULTANT_ENGINEER remains restricted from verification navigation and routes because the backend role gate alone is insufficient: existing project ownership checks provide no consultant project-membership scope. No backend ownership checks were weakened.
+VALIDATION:
 
-The project workflow uses the existing API: CLIENT creates a project with a selected contractor; the server derives client ownership from the authenticated user; the owning client can later reassign through `PATCH /api/v1/projects/:projectId/contractor`. Contractors read only projects assigned to their account through `GET /api/v1/projects`, and project/milestone/evidence/passport access continues to use the existing ownership checks. Client pages no longer advertise evidence upload or verification routes that the backend does not authorize.
+* Fresh isolated PostgreSQL database: all 20 Prisma migrations applied; migration status current.
+* Demo seed: run twice against the configured demo database without accumulating demo accounts/projects; CRB tests also passed with `CRB-DEMO-001` present.
+* Backend: 48 files, 359/359 tests PASS; TypeScript build and Prisma validation PASS; no backend lint script is configured.
+* Phase 5 HTTP acceptance: 2/2 tests PASS. Focused public-verification, project-ownership, and authorization smoke: 25/25 tests PASS.
+* Frontend: 41 files, 361/361 tests PASS; TypeScript, ESLint, and production build PASS.
+* Contracts: 6/6 Hardhat tests PASS, including the live local-chain backend tests in the backend suite.
+* Documentation was aligned with current CLIENT project ownership and `requiredApprovals` behavior. No backend/frontend product behavior changed in Phase 6.
 
-Disputes, corrections, variations, audit, and settings remain incomplete or placeholder routes and are omitted from primary navigation. No full workflow was added for them. This task does not represent CRB/NeST lookup data as live external verification. No schema, external integration, public passport, new role, or blockchain functionality was added for this task.
+KNOWN RELEASE GAPS:
 
-TESTS:
-
-* Focused frontend role/workflow tests — 4 files, 57/57 tests PASS.
-* Full frontend suite — 31 files, 248/248 tests PASS.
-* Frontend ESLint and TypeScript/production build — PASS.
-* Backend suite on the latest shared worktree — 37/38 files passed; 264/265 tests passed. `test/evidence-version.repository.test.ts` still expects `crbSource` to be `SYNTHETIC_DEMO`, but the current schema returned `null` before a CRB check.
-* Backend TypeScript build — BLOCKED by `backend/src/services/contractor.service.ts:27`: nullable `crbSource` is assigned to the non-null `PublicContractor.crbSource` type. This mismatch is outside the role-visibility edits and was not changed.
-* Prisma schema validation — PASS.
-
-KNOWN LIMITATIONS:
-
-* CONSULTANT_ENGINEER still has no project membership/oversight relationship and therefore cannot use the nominal backend verification/attestation grants against projects. The frontend keeps this role restricted rather than bypassing backend scope.
-* Attestation is available only through the internal verification screen where the current route and project policy permit it; there is no distinct client review decision workflow.
-* Dispute, correction, variation, audit, and settings routes remain placeholders or unavailable. Evidence version append is not exposed by an HTTP route.
-* Public verification is supported; public passports are not.
-* This task does not validate CRB/NeST adapter selection or claim live external verification.
+* `POST /api/v1/public/verify` has no rate limit and persists a comparison row per request; defer rate-limit work until after the presentation as planned.
+* The configured demo database has no blockchain registry configuration. Its reproducible seed therefore creates no confirmed blockchain events; the live local-chain tests verify real transaction persistence when a registry is configured.
+* `CONSULTANT_ENGINEER` has no project relationship and remains unable to access project-scoped records.
 
 ---
 
@@ -585,7 +578,9 @@ TASK 3 — Derived Contractor Passport
 
 ---
 
-## TASK 1
+## TASK 1 (Historical Snapshot)
+
+The phase-specific status below predates the current client-owned project model. Use [docs/API.md](API.md) for current authorization and endpoint behavior.
 
 TASK:
 Projects, Milestones & Ownership/IDOR

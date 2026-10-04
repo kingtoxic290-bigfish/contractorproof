@@ -45,7 +45,7 @@ async function cleanup(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      contractor: { include: { projects: { include: { milestones: true } } } },
+      contractor: true,
       uploadedEvidence: true,
     },
   });
@@ -53,7 +53,25 @@ async function cleanup(userId: string) {
     return;
   }
 
-  const evidenceIds = user.uploadedEvidence.map((row) => row.id);
+  const contractorId = user.contractor?.id;
+  const projectIds = contractorId
+    ? await prisma.project
+        .findMany({ where: { contractorId }, select: { id: true } })
+        .then((rows) => rows.map((row) => row.id))
+    : [];
+
+  const milestoneIds = projectIds.length
+    ? await prisma.milestone
+        .findMany({ where: { projectId: { in: projectIds } }, select: { id: true } })
+        .then((rows) => rows.map((row) => row.id))
+    : [];
+
+  const evidenceIds = milestoneIds.length
+    ? await prisma.evidence
+        .findMany({ where: { milestoneId: { in: milestoneIds } }, select: { id: true } })
+        .then((rows) => rows.map((row) => row.id))
+    : user.uploadedEvidence.map((row) => row.id);
+
   if (evidenceIds.length > 0) {
     await prisma.verification.deleteMany({
       where: { evidenceVersion: { evidenceId: { in: evidenceIds } } },
@@ -70,17 +88,14 @@ async function cleanup(userId: string) {
     });
   }
 
-  const milestoneIds =
-    user.contractor?.projects.flatMap((project) => project.milestones.map((row) => row.id)) ?? [];
   if (milestoneIds.length > 0) {
     await prisma.milestone.deleteMany({ where: { id: { in: milestoneIds } } });
   }
-  const projectIds = user.contractor?.projects.map((project) => project.id) ?? [];
   if (projectIds.length > 0) {
     await prisma.project.deleteMany({ where: { id: { in: projectIds } } });
   }
-  if (user.contractor) {
-    await prisma.contractor.delete({ where: { id: user.contractor.id } });
+  if (contractorId) {
+    await prisma.contractor.delete({ where: { id: contractorId } });
   }
   await prisma.user.delete({ where: { id: user.id } });
 }
@@ -244,6 +259,53 @@ describe("evidence versioning", () => {
     const reloaded = await evidenceRepository.findById(evidence.id);
     expect(reloaded?.status).toBe("PENDING_VERIFICATION");
     expect(reloaded?.versions[0]?.sha256).toBe(HASH_A);
+  });
+
+  it("rolls back current-state and version history together when a write fails mid-transaction", async () => {
+    const { user, milestone } = await seedMilestone();
+    userId = user.id;
+
+    await expect(
+      prisma.$transaction(async (tx) => {
+        const evidence = await tx.evidence.create({
+          data: {
+            milestoneId: milestone.id,
+            uploadedById: user.id,
+            fileName: "rollback.bin",
+            storageKey: "rollback",
+            mimeType: "application/octet-stream",
+            sizeBytes: 5,
+            sha256: HASH_A,
+            status: "PENDING_VERIFICATION",
+          },
+        });
+
+        await tx.evidenceVersion.create({
+          data: {
+            evidenceId: evidence.id,
+            versionNumber: 1,
+            storageReference: "rollback",
+            fileName: "rollback.bin",
+            mimeType: "application/octet-stream",
+            sizeBytes: 5,
+            sha256: HASH_A,
+            createdById: user.id,
+          },
+        });
+
+        throw new Error("simulated transaction failure");
+      }),
+    ).rejects.toThrow("simulated transaction failure");
+
+    const evidenceRows = await prisma.evidence.findMany({
+      where: { milestoneId: milestone.id },
+    });
+    const versionRows = await prisma.evidenceVersion.findMany({
+      where: { evidence: { milestoneId: milestone.id } },
+    });
+
+    expect(evidenceRows).toEqual([]);
+    expect(versionRows).toEqual([]);
   });
 
   it("leaves existing user and contractor rows valid after versioned evidence writes", async () => {

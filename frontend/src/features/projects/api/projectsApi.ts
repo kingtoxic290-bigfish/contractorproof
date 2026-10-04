@@ -1,6 +1,11 @@
 import { apiRequest } from "../../../services/api/client";
 import { isPlainRecord, unwrapNamedList, unwrapNamedRecord } from "../../shared/query";
-import { parsePublicProject, type PublicProject } from "../types";
+import {
+  parseProjectLifecycleHistoryEntry,
+  parsePublicProject,
+  type ProjectLifecycleHistoryEntry,
+  type PublicProject,
+} from "../types";
 
 export type ProjectCreateInput = {
   name: string;
@@ -77,4 +82,30 @@ export async function assignProjectContractor(projectId: string, contractorId: s
     throw new Error("The contractor assignment response is not in a known format.");
   }
   return project;
+}
+
+/**
+ * Recorded project lifecycle transitions.
+ *
+ * Read-only. The server owns every lifecycle decision; this endpoint only
+ * reports what was recorded, so the history is never a client-side inference.
+ */
+export async function listProjectLifecycleHistory(
+  projectId: string,
+): Promise<ProjectLifecycleHistoryEntry[]> {
+  const payload = await apiRequest<unknown>(
+    `/projects/${encodeURIComponent(projectId)}/lifecycle-history`,
+  );
+  const records = unwrapNamedList(payload, "history");
+  if (!records) {
+    throw new Error("The project lifecycle history response is not in a known format.");
+  }
+
+  const entries = records
+    .map(parseProjectLifecycleHistoryEntry)
+    .filter((entry): entry is ProjectLifecycleHistoryEntry => entry !== null);
+  if (entries.length !== records.length) {
+    throw new Error("The project lifecycle history response is not in a known format.");
+  }
+  return entries;
 }

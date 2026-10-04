@@ -76,7 +76,10 @@ describe("contractors", () => {
     expect(screen.getAllByText("c1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Not provided").length).toBeGreaterThan(0);
     expect(screen.queryByText("Trust Score")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View Contractor Passports" })).toHaveAttribute("href", "/passports");
+    expect(screen.getByRole("link", { name: "Open Contractor Passport" })).toHaveAttribute(
+      "href",
+      "/contractors/c1/passport",
+    );
   });
 
   it("shows a not-found state for a missing contractor", async () => {

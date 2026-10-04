@@ -35,7 +35,7 @@ describe("contractor passports", () => {
   it("shows loading while the authorized Passport list is pending", async () => {
     vi.mocked(getOfficialPassports).mockReturnValue(new Promise(() => undefined));
     renderApp("/passports");
-    expect(await screen.findByText("Loading contractor passports...")).toBeInTheDocument();
+    expect(await screen.findByText("Loading project passports...")).toBeInTheDocument();
   });
 
   it("lists backend contractor and project records with a project Passport link", async () => {

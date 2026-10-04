@@ -1,6 +1,6 @@
 # Frontend API requirements
 
-Stage 1 (auth + shell) remains described here. **New domain contracts and envelopes are in [docs/api/contracts.md](api/contracts.md).** Agent 0 baseline: [docs/architecture/](architecture/README.md).
+Historical phased frontend/API requirements snapshot. The current backend contract, response envelopes, and authorization rules are in [docs/API.md](API.md); this document may describe earlier scaffold behavior and is not current implementation guidance. Agent 0 baseline: [docs/architecture/](architecture/README.md).
 
 This document lists APIs used or required by the frontend. It distinguishes implemented HTTP contracts from missing ones.
 

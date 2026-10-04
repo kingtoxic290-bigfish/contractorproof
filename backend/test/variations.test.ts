@@ -145,6 +145,9 @@ describe("variation lifecycle", () => {
     expect(passport.body.data.passport.project.name).toBe("Current revised name");
     expect(passport.body.data.passport.variations[0].originalState.project.name).toBe(base.project.name);
     expect(passport.body.data.passport.variations[0].status).toBe("APPROVED");
+    expect(passport.body.data.passport.variations[0].review).not.toHaveProperty("reviewedById");
+    expect(passport.body.data.passport.variations[0].resolutions[0]).not.toHaveProperty("resolvedById");
+    expect(passport.body.data.passport.variations[0].resolutions[0].resolvedByRole).toBe("ADMIN");
   });
 
   it("rejects invalid references and conflicting resolutions", async () => {

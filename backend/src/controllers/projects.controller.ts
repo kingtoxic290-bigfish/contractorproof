@@ -7,6 +7,8 @@ import {
   projectListWhere,
 } from "../services/access.service";
 import { projectService } from "../services/project.service";
+import { projectLifecycleService } from "../services/projectLifecycle.service";
+import { milestoneHistoryService } from "../services/milestoneHistory.service";
 import { requireUuid } from "../services/evidence/validation";
 
 function requireUser(req: Request) {
@@ -77,6 +79,36 @@ export async function assignProjectContractor(
   }
 }
 
+export async function listProjectLifecycleHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const projectId = requireUuid(req.params.projectId, "projectId");
+    const history = await projectLifecycleService.listHistory(actor, projectId);
+    sendData(res, { history });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function transitionProjectLifecycle(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const projectId = requireUuid(req.params.projectId, "projectId");
+    const result = await projectLifecycleService.transition(actor, projectId, req.body ?? {});
+    sendData(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function listProjectMilestones(
   req: Request,
   res: Response,
@@ -136,6 +168,36 @@ export async function getMilestone(
     );
     await assertCanReadMilestone(actor, milestone.id);
     res.json({ milestone });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listMilestoneStatusHistory(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestoneId = requireUuid(req.params.milestoneId, "milestoneId");
+    const history = await milestoneHistoryService.list(actor, milestoneId);
+    sendData(res, { history });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function transitionMilestone(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const actor = requireUser(req);
+    const milestoneId = requireUuid(req.params.milestoneId, "milestoneId");
+    const result = await milestoneHistoryService.transition(actor, milestoneId, req.body ?? {});
+    sendData(res, result);
   } catch (error) {
     next(error);
   }

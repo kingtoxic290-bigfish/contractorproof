@@ -1,7 +1,6 @@
 # API Contracts
 
-Status: frozen shapes for implementation. Not all endpoints must be built now.  
-Existing working payloads are listed as **current**. New work uses **target** envelopes.
+Historical Stage 2 design snapshot. It is superseded by the [current API contract](../API.md); endpoint status, authorization, and payload descriptions below are not current implementation guidance.
 
 `requestId` is generated per request by Agent 2 middleware.
 

@@ -19,10 +19,21 @@ import {
 
 /** Sets the CRB reference on a contractor so a check can actually run. */
 async function withReference(contractorId: string, reference: string) {
-  return prisma.contractor.update({
+  const uniqueReference = `${reference}-${contractorId.slice(0, 8).toUpperCase()}`;
+  setCrbAdapterFactory(() => ({
+    source: "SANDBOX",
+    isConfigured: () => true,
+    lookup: async (requestedReference) => {
+      const fixtureReference = requestedReference.replace(/-[A-F0-9]{8}$/, "");
+      const result = await sandboxCrbAdapter.lookup(fixtureReference);
+      return { ...result, registrationReference: requestedReference };
+    },
+  }));
+  await prisma.contractor.update({
     where: { id: contractorId },
-    data: { crbRegistrationNumber: reference },
+    data: { crbRegistrationNumber: uniqueReference },
   });
+  return uniqueReference;
 }
 
 describe("CRB adapter: outage is never reported as non-registration", () => {
@@ -121,7 +132,7 @@ describe("CRB verification is contractor-scoped, RBAC-protected and auditable", 
 
   it("records a factual REGISTERED result with a deterministic digest", async () => {
     const contractor = await registerContractor();
-    await withReference(contractor.contractorId, "CRB-DEMO-001");
+    const registrationReference = await withReference(contractor.contractorId, "CRB-DEMO-001");
     const admin = await privileged("ADMIN" as never);
 
     const response = await request(app)
@@ -132,7 +143,7 @@ describe("CRB verification is contractor-scoped, RBAC-protected and auditable", 
     expect(response.body.data.verification).toMatchObject({
       status: "REGISTERED",
       source: "SANDBOX",
-      registrationReference: "CRB-DEMO-001",
+      registrationReference,
       registeredName: "Harbor Works Limited (sandbox record)",
       failureCode: null,
     });

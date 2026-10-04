@@ -2,13 +2,13 @@ import { BlockchainEventType } from "@prisma/client";
 import type { PublicUser } from "../types";
 import { ApiError } from "../http/errors";
 import { assertCanReadProject, projectListWhere } from "./access.service";
-import { passportRepository, type PassportProjectRow } from "../repositories/passport.repository";
+import { passportRepository, type PassportProjectWithHistory } from "../repositories/passport.repository";
 
 function iso(value: Date | null): string | null {
   return value?.toISOString() ?? null;
 }
 
-function toPassportProof(event: PassportProjectRow["blockchainEvents"][number]) {
+function toPassportProof(event: PassportProjectWithHistory["blockchainEvents"][number]) {
   const confirmed = Boolean(event.txHash && event.blockNumber != null && event.blockNumber > 0);
   return {
     id: event.id,
@@ -45,7 +45,7 @@ function toRelatedProof(event: {
   };
 }
 
-function procurementObservationView(observation: PassportProjectRow["contractor"]["procurementLinks"][number]["procurementRecord"]["observations"][number]) {
+function procurementObservationView(observation: PassportProjectWithHistory["contractor"]["procurementLinks"][number]["procurementRecord"]["observations"][number]) {
   return {
     id: observation.id,
     ocid: observation.ocid,
@@ -74,7 +74,7 @@ function procurementObservationView(observation: PassportProjectRow["contractor"
   };
 }
 
-function projectPassport(row: PassportProjectRow) {
+function projectPassport(row: PassportProjectWithHistory) {
   const blockchainProofs = row.blockchainEvents.map(toPassportProof);
   const proofFor = (eventType: BlockchainEventType, referenceId: string) =>
     blockchainProofs.find(
@@ -105,6 +105,7 @@ function projectPassport(row: PassportProjectRow) {
     },
     project: {
       id: row.id,
+      lifecycleStatus: row.lifecycleStatus,
       contractorId: row.contractorId,
       name: row.name,
       description: row.description,
@@ -118,11 +119,34 @@ function projectPassport(row: PassportProjectRow) {
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     },
+    lifecycleHistory: row.lifecycleHistory.map((entry) => ({
+      id: entry.id,
+      sequence: entry.sequence,
+      previousStatus: entry.previousStatus,
+      newStatus: entry.newStatus,
+      actorName: entry.actorName,
+      actorRole: entry.actorRole,
+      isBaseline: entry.isBaseline,
+      reason: entry.reason,
+      createdAt: entry.createdAt.toISOString(),
+    })),
     milestones: row.milestones.map((milestone) => ({
       id: milestone.id,
       name: milestone.name,
       description: milestone.description,
       status: milestone.status,
+      statusHistory: milestone.statusHistory.map((entry) => ({
+        id: entry.id,
+        sequence: entry.sequence,
+        previousStatus: entry.previousStatus,
+        newStatus: entry.newStatus,
+        actorName: entry.actorName,
+        actorRole: entry.actorRole,
+        evidenceId: entry.evidenceId,
+        isBaseline: entry.isBaseline,
+        reason: entry.reason,
+        createdAt: entry.createdAt.toISOString(),
+      })),
       policy: milestone.policy
         ? {
             id: milestone.policy.id,
@@ -204,7 +228,6 @@ function projectPassport(row: PassportProjectRow) {
           id: resolution.id,
           status: resolution.status,
           resolution: resolution.resolution,
-          resolvedById: resolution.resolvedById,
           resolvedByRole: resolution.resolvedBy.role,
           correctedEvidenceVersion: resolution.correctedEvidenceVersion
             ? {
@@ -218,6 +241,25 @@ function projectPassport(row: PassportProjectRow) {
           createdAt: resolution.createdAt.toISOString(),
         })),
       })),
+      disputes: milestone.disputes.map((dispute) => ({
+        id: dispute.id,
+        evidenceId: dispute.evidenceId,
+        status: dispute.status,
+        reason: dispute.reason,
+        raisedByRole: dispute.raisedBy.role,
+        originalProof: toRelatedProof(dispute.originalEvent),
+        disputeProof: toRelatedProof(dispute.disputeEvent),
+        resolutionProof: toRelatedProof(dispute.resolutionEvent),
+        resolutions: dispute.resolutions.map((resolution) => ({
+          id: resolution.id,
+          status: resolution.status,
+          resolution: resolution.resolution,
+          resolvedByRole: resolution.resolvedBy.role,
+          createdAt: resolution.createdAt.toISOString(),
+        })),
+        createdAt: dispute.createdAt.toISOString(),
+        updatedAt: dispute.updatedAt.toISOString(),
+      })),
     })),
     variations: row.variations.map((variation) => ({
       id: variation.id,
@@ -225,7 +267,7 @@ function projectPassport(row: PassportProjectRow) {
       reason: variation.reason,
       status: variation.status,
       createdAt: variation.createdAt.toISOString(),
-      review: variation.reviewedAt ? { reviewedById: variation.reviewedById, reviewedByRole: variation.reviewedBy?.role ?? null, reviewedAt: variation.reviewedAt.toISOString() } : null,
+      review: variation.reviewedAt ? { reviewedByRole: variation.reviewedBy?.role ?? null, reviewedAt: variation.reviewedAt.toISOString() } : null,
       originalState: variation.originalState,
       proposedState: variation.proposedState,
       milestone: variation.milestone,
@@ -237,7 +279,6 @@ function projectPassport(row: PassportProjectRow) {
         status: resolution.status,
         decision: resolution.decision,
         note: resolution.note,
-        resolvedById: resolution.resolvedById,
         resolvedByRole: resolution.resolvedBy.role,
         createdAt: resolution.createdAt.toISOString(),
       })),

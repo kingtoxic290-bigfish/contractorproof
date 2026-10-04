@@ -16,7 +16,6 @@ function toIsoString(value: Date | null): string | null {
 function toPublicContractor(row: ContractorWithPublicUser): PublicContractor {
   return {
     id: row.id,
-    userId: row.userId,
     legalName: row.legalName,
     crbRegistrationNumber: row.crbRegistrationNumber,
     crbCategory: row.crbCategory,
@@ -27,12 +26,6 @@ function toPublicContractor(row: ContractorWithPublicUser): PublicContractor {
     crbSource: row.crbSource,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    user: {
-      id: row.user.id,
-      email: row.user.email,
-      fullName: row.user.fullName,
-      role: row.user.role,
-    },
   };
 }
 

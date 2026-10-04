@@ -97,7 +97,7 @@ describe("create project contractor selector", () => {
     await screen.findByRole("option", { name: "Harbor Works Ltd" });
     await screen.findByRole("option", { name: "Unverified Quarry Ltd" });
 
-    const selector = screen.getByLabelText("Assign contractor");
+    const selector = screen.getByLabelText("Assigned Contractor");
     const options = screen.getAllByRole("option").map((option) => option.textContent);
 
     expect(options).toContain("Harbor Works Ltd");
@@ -114,7 +114,7 @@ describe("create project contractor selector", () => {
 
     await screen.findByRole("option", { name: "Unverified Quarry Ltd" });
 
-    const selector = screen.getByLabelText("Assign contractor");
+    const selector = screen.getByLabelText("Assigned Contractor");
     expect(screen.getAllByRole("option").length).toBeGreaterThan(1);
     expect(selector).not.toBeDisabled();
   });
@@ -132,7 +132,7 @@ describe("create project contractor selector", () => {
     renderApp("/projects/new");
     await screen.findByRole("option", { name: "Unverified Quarry Ltd" });
     await user.type(screen.getByLabelText("Project name"), "New bridge");
-    await user.selectOptions(screen.getByLabelText("Assign contractor"), "contractor-2");
+    await user.selectOptions(screen.getByLabelText("Assigned Contractor"), "contractor-2");
     await user.click(screen.getByRole("button", { name: "Create Project and Assign Contractor" }));
 
     expect(await screen.findByText("Project created and assigned to Unverified Quarry Ltd.")).toBeInTheDocument();

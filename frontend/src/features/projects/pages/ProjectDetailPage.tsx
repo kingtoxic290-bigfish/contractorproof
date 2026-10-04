@@ -4,9 +4,18 @@ import { Card } from "../../../components/ui/Card";
 import { PageHeader } from "../../../components/ui/PageHeader";
 import { useAuth } from "../../../hooks/useAuth";
 import { useProjectMilestones } from "../../milestones/hooks/useProjectMilestones";
+import { useMilestoneHistory } from "../../milestones/hooks/useMilestoneHistory";
+import {
+  MilestoneExecutionSummary,
+  MilestoneStatusBadge,
+} from "../../milestones/components/MilestoneExecutionSummary";
 import { QueryPanel } from "../../shared/QueryPanel";
 import { RecordFields } from "../../shared/RecordFields";
 import { ContractorAssignmentPanel } from "../components/ContractorAssignmentPanel";
+import {
+  ProjectLifecyclePanel,
+  milestoneReadiness,
+} from "../components/ProjectLifecyclePanel";
 import { useProject } from "../hooks/useProject";
 import { useEvidence } from "../../evidence/hooks/useEvidence";
 import { VerificationStatus } from "../../verification/components/VerificationStatus";
@@ -37,6 +46,7 @@ function MilestoneDetail({
   canReview: boolean;
 }) {
   const evidence = useEvidence(milestone.id, undefined, true);
+  const history = useMilestoneHistory(milestone.id);
   const evidenceRecords = evidence.records ?? [];
   const evidenceCount = evidenceRecords.length;
 
@@ -47,6 +57,7 @@ function MilestoneDetail({
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center gap-2">
+        <MilestoneStatusBadge status={milestone.status} />
         <span className="text-xs text-stone-500">Project {milestone.projectId}</span>
       </div>
       <h3 className="mb-3 min-w-0 break-words text-base font-medium text-stone-900">
@@ -94,7 +105,21 @@ function MilestoneDetail({
         }}
       />
 
+      <div className="mt-4 border-t border-stone-200 pt-4">
+        <MilestoneExecutionSummary
+          milestone={milestone}
+          history={history.data ?? []}
+          historyStatus={history.status}
+        />
+      </div>
+
       <div className="mt-4 flex flex-wrap gap-3">
+        <Link
+          to={`/milestones/${encodeURIComponent(milestone.id)}`}
+          className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+        >
+          Open milestone
+        </Link>
         <Link
           to={`/evidence?milestoneId=${encodeURIComponent(milestone.id)}`}
           className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
@@ -119,10 +144,16 @@ export function ProjectDetailPage() {
   const { user, hasRole } = useAuth();
   const canManageProject = hasRole("CLIENT", "ADMIN");
   const canReview = hasRole("ADMIN", "AUDITOR", "PROCUREMENT_OFFICER");
+  // Only roles that can already read a contractor passport may be linked to it.
+  const canViewContractorPassport = hasRole("CLIENT", "ADMIN", "AUDITOR", "PROCUREMENT_OFFICER");
   const project = useProject(projectId);
   const [assignedProject, setAssignedProject] = useState<typeof project.data>(null);
   const projectData = assignedProject ?? project.data;
   const milestones = useProjectMilestones(projectId);
+  // Readiness is only stated once the milestone records have actually loaded, so
+  // a failed or in-flight milestone query is never reported as "no milestones".
+  const milestonesLoaded = milestones.status === "success" || milestones.status === "empty";
+  const readiness = milestonesLoaded ? milestoneReadiness(milestones.records) : null;
 
   return (
     <section className="space-y-6">
@@ -162,13 +193,22 @@ export function ProjectDetailPage() {
                   {projectData.clientName ?? (user?.role === "CLIENT" ? `${user.fullName} (you)` : "Client not provided")}
                 </dd>
               </div>
-              <div>
+              <div className="min-w-0">
                 <dt className="text-xs uppercase tracking-wide text-stone-500">Assigned contractor</dt>
                 <dd className="mt-1 text-sm font-medium text-stone-900">
                   {projectData.contractorName} · {projectData.contractorId}
+                  {projectData.contractorCrbRegistrationNumber ? (
+                    <span className="mt-1 block break-words text-xs font-normal text-stone-600">
+                      CRB {projectData.contractorCrbRegistrationNumber}
+                    </span>
+                  ) : null}
                 </dd>
               </div>
             </dl>
+            <p className="mb-4 text-sm text-stone-600">
+              The client owns this project relationship. The contractor above is assigned to it and
+              executes its milestones; assignment does not transfer ownership.
+            </p>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="min-w-0">
                 <dt className="text-xs font-semibold uppercase tracking-wide text-stone-500">Project reference</dt>
@@ -207,6 +247,14 @@ export function ProjectDetailPage() {
                   Create milestone
                 </Link>
               ) : null}
+              {canViewContractorPassport ? (
+                <Link
+                  to={`/contractors/${encodeURIComponent(projectData.contractorId)}/passport`}
+                  className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
+                >
+                  View assigned contractor Passport
+                </Link>
+              ) : null}
               <Link
                 to={`/passports/${encodeURIComponent(projectData.id)}`}
                 className="text-sm font-medium text-teal-900 underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-800"
@@ -217,6 +265,13 @@ export function ProjectDetailPage() {
           </Card>
         ) : null}
       </QueryPanel>
+      {projectData ? (
+        <ProjectLifecyclePanel
+          projectId={projectData.id}
+          lifecycleStatus={projectData.lifecycleStatus}
+          readiness={readiness}
+        />
+      ) : null}
       <div>
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>

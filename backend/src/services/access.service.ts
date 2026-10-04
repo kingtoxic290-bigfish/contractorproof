@@ -152,8 +152,29 @@ export function blockchainEventListWhere(
 
 /**
  * SQL where-clause for GET /contractors. Same matrix as project list.
+ *
+ * `crbRegistrationNumber` is a discovery key, never a ranking signal. It is an
+ * exact, case-insensitive match against the ContractorProof contractor record,
+ * so a search can only ever narrow the caller's existing access set.
  */
-export function contractorListWhere(actor: PublicUser): Prisma.ContractorWhereInput {
+export function contractorListWhere(
+  actor: PublicUser,
+  filters: { crbRegistrationNumber?: string } = {},
+): Prisma.ContractorWhereInput {
+  const base = contractorAccessWhere(actor);
+  const registrationNumber = filters.crbRegistrationNumber?.trim();
+  if (!registrationNumber) {
+    return base;
+  }
+  return {
+    AND: [
+      base,
+      { crbRegistrationNumber: { equals: registrationNumber, mode: "insensitive" } },
+    ],
+  };
+}
+
+function contractorAccessWhere(actor: PublicUser): Prisma.ContractorWhereInput {
   if (PRIVILEGED_READ_ROLES.includes(actor.role)) {
     return {};
   }

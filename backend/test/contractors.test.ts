@@ -101,17 +101,12 @@ describe("GET /api/v1/contractors", () => {
     );
     expect(match).toMatchObject({
       id: contractorId,
-      userId: account.userId,
       legalName: account.fullName,
       crbSource: null,
       crbStatus: null,
-      user: {
-        id: account.userId,
-        email: account.email,
-        fullName: account.fullName,
-        role: "CONTRACTOR",
-      },
     });
+    expect(match).not.toHaveProperty("userId");
+    expect(match).not.toHaveProperty("user");
     assertNoSensitiveUserFields(response.body);
   });
 
@@ -137,15 +132,8 @@ describe("GET /api/v1/contractors", () => {
     expect(response.status).toBe(200);
     assertNoSensitiveUserFields(response.body);
     for (const contractor of response.body.contractors) {
-      expect(contractor.user).toEqual(
-        expect.objectContaining({
-          id: expect.any(String),
-          email: expect.any(String),
-          fullName: expect.any(String),
-          role: expect.any(String),
-        }),
-      );
-      expect(contractor.user).not.toHaveProperty("passwordHash");
+      expect(contractor).not.toHaveProperty("userId");
+      expect(contractor).not.toHaveProperty("user");
     }
   });
 });
@@ -170,7 +158,6 @@ describe("GET /api/v1/contractors/:contractorId", () => {
     expect(response.status).toBe(200);
     expect(response.body.contractor).toMatchObject({
       id: contractorId,
-      userId: account.userId,
       legalName: "Detail Contractor",
       crbRegistrationNumber: null,
       crbCategory: null,
@@ -179,13 +166,9 @@ describe("GET /api/v1/contractors/:contractorId", () => {
       crbStatus: null,
       crbLastVerifiedAt: null,
       crbSource: null,
-      user: {
-        id: account.userId,
-        email: account.email,
-        fullName: "Detail Contractor",
-        role: "CONTRACTOR",
-      },
     });
+    expect(response.body.contractor).not.toHaveProperty("userId");
+    expect(response.body.contractor).not.toHaveProperty("user");
     expect(response.body.contractor.createdAt).toEqual(expect.any(String));
     expect(response.body.contractor.updatedAt).toEqual(expect.any(String));
     assertNoSensitiveUserFields(response.body);
@@ -223,6 +206,7 @@ describe("GET /api/v1/contractors/:contractorId", () => {
 
     expect(response.status).toBe(200);
     assertNoSensitiveUserFields(response.body);
-    expect(response.body.contractor.user).not.toHaveProperty("passwordHash");
+    expect(response.body.contractor).not.toHaveProperty("userId");
+    expect(response.body.contractor).not.toHaveProperty("user");
   });
 });

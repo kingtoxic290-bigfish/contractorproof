@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, FileCheck2 } from "lucide-react";
+import { ArrowRight, FileCheck2, Scale } from "lucide-react";
 import { Card } from "../../../components/ui/Card";
 import { RecordFields } from "../../shared/RecordFields";
 import { StateLabel } from "../../shared/StateLabel";
+import { useAuth } from "../../../hooks/useAuth";
 import type { PublicMilestone } from "../types";
 
 /**
@@ -19,6 +20,11 @@ export function MilestoneList({
   records: PublicMilestone[];
   projectId?: string;
 }) {
+  const { hasRole } = useAuth();
+  // The review screen is the client's decision point, so it is offered here
+  // rather than only from the milestone detail page.
+  const canReview = hasRole("CLIENT", "ADMIN");
+
   return (
     <ul className="grid gap-4">
       {records.map((record) => {
@@ -29,7 +35,16 @@ export function MilestoneList({
             <Card>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  {associatedProject ? (
+{canReview ? (
+                  <Link
+                    to={`/milestones/${encodeURIComponent(record.id)}/review`}
+                    className="inline-flex items-center gap-1.5 font-semibold text-[#0f3d3a] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0f3d3a]"
+                  >
+                    <Scale className="h-4 w-4" aria-hidden="true" />
+                    Review submission
+                  </Link>
+                ) : null}
+                {associatedProject ? (
                     <p className="text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-stone-500">
                       Project {associatedProject}
                     </p>

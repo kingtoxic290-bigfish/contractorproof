@@ -14,8 +14,8 @@ export function PassportDetailPage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Contractor Passport"
-        description="A comprehensive record of contractor identity, project milestones, evidence, verification outcomes, attestations, and blockchain proof events."
+        title="Project Passport"
+        description="A record of one project: contractor identity, milestones, evidence, verification outcomes, attestations, and blockchain proof events."
         icon={ContactRound}
       />
       <Link

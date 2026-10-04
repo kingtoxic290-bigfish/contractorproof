@@ -223,6 +223,8 @@ describe("derived contractor passports", () => {
     expect(passportEvidence.versions[0]).not.toHaveProperty("storageReference");
     expect(passportAttestation).not.toHaveProperty("verifierId");
     expect(passportAttestation).not.toHaveProperty("comment");
+    const passportKeys = JSON.stringify(passport);
+    expect(passportKeys).not.toMatch(/"(userId|actorId|requestedById|resolvedById|reviewedById)"/);
     assertNoSecrets(response.body, [owner.email, auditor.email]);
   });
 

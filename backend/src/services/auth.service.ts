@@ -11,6 +11,7 @@ import { hashPassword, verifyPasswordOrDummy } from "../utils/password";
 import { signAccessToken } from "../utils/jwt";
 import { HttpError } from "../middleware/errorHandler";
 import { ApiError } from "../http/errors";
+import { isValidCrbReference } from "../integrations/crb";
 
 function toPublicUser(user: { id: string; email: string; fullName: string; role: Role }): PublicUser {
   return {
@@ -35,6 +36,7 @@ export const authService = {
     password: string;
     fullName: string;
     role: string;
+    crbRegistrationNumber?: unknown;
   }): Promise<{ token: string; user: PublicUser }> {
     const email = input.email.trim();
     const fullName = input.fullName.trim();
@@ -48,6 +50,23 @@ export const authService = {
     }
     if (role === Role.ADMIN || isPrivilegedRole(role) || !isPublicRegisterRole(role)) {
       throw new HttpError(400, "role is not allowed for public registration");
+    }
+
+    const crbRegistrationNumber = typeof input.crbRegistrationNumber === "string"
+      ? input.crbRegistrationNumber.trim().toUpperCase()
+      : "";
+    if (input.crbRegistrationNumber !== undefined &&
+      (role !== Role.CONTRACTOR || !isValidCrbReference(crbRegistrationNumber))) {
+      throw new HttpError(400, "CRB registration number is invalid");
+    }
+    if (crbRegistrationNumber) {
+      const existingContractor = await prisma.contractor.findFirst({
+        where: { crbRegistrationNumber: { equals: crbRegistrationNumber, mode: "insensitive" } },
+        select: { id: true },
+      });
+      if (existingContractor) {
+        throw new HttpError(409, "CRB registration number is already registered");
+      }
     }
 
     const existing = await userRepository.findByEmail(email);
@@ -73,6 +92,7 @@ export const authService = {
           data: {
             userId: created.id,
             legalName: fullName,
+            crbRegistrationNumber: crbRegistrationNumber || null,
           },
         });
       }

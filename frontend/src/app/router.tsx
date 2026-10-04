@@ -9,10 +9,12 @@ import { CORRECTION_PAGE_ROLES } from "../features/corrections/types";
 import { DisputesPage } from "../features/disputes/pages/DisputesPage";
 import { DISPUTE_PAGE_ROLES } from "../features/disputes/types";
 import { ContractorDetailPage } from "../features/contractors/pages/ContractorDetailPage";
+import { ContractorPassportPage } from "../features/contractors/pages/ContractorPassportPage";
 import { ContractorsPage } from "../features/contractors/pages/ContractorsPage";
 import { EvidencePage } from "../features/evidence/pages/EvidencePage";
 import { MilestoneCreatePage } from "../features/milestones/pages/MilestoneCreatePage";
 import { MilestoneDetailPage } from "../features/milestones/pages/MilestoneDetailPage";
+import { MilestoneReviewPage } from "../features/milestones/pages/MilestoneReviewPage";
 import { MilestonesPage } from "../features/milestones/pages/MilestonesPage";
 import { PassportDetailPage } from "../features/passports/pages/PassportDetailPage";
 import { PassportsPage } from "../features/passports/pages/PassportsPage";
@@ -23,6 +25,7 @@ import { ProjectDetailPage } from "../features/projects/pages/ProjectDetailPage"
 import { ProjectsPage } from "../features/projects/pages/ProjectsPage";
 import { DashboardPage } from "../pages/DashboardPage";
 import { ForbiddenPage } from "../pages/ForbiddenPage";
+import { LandingPage } from "../pages/LandingPage";
 import { LoginPage } from "../pages/LoginPage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 import { PlaceholderPage } from "../pages/PlaceholderPage";
@@ -32,6 +35,7 @@ import { UnauthorizedPage } from "../pages/UnauthorizedPage";
 export function AppRouter() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route element={<PublicLayout />}>
         <Route
           path="/login"
@@ -54,10 +58,18 @@ export function AppRouter() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/contractors" element={<ContractorsPage />} />
+        <Route
+          path="/contractors/me/passport"
+          element={
+            <RoleGate allow={["CONTRACTOR"]}>
+              <ContractorPassportPage />
+            </RoleGate>
+          }
+        />
         <Route path="/contractors/:contractorId" element={<ContractorDetailPage />} />
+        <Route path="/contractors/:contractorId/passport" element={<ContractorPassportPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route
           path="/projects/new"
@@ -78,6 +90,14 @@ export function AppRouter() {
         />
         <Route path="/milestones" element={<MilestonesPage />} />
         <Route path="/milestones/:milestoneId" element={<MilestoneDetailPage />} />
+        <Route
+          path="/milestones/:milestoneId/review"
+          element={
+            <RoleGate allow={["CLIENT", "ADMIN"]}>
+              <MilestoneReviewPage />
+            </RoleGate>
+          }
+        />
         <Route path="/evidence" element={<EvidencePage />} />
         <Route
           path="/verification"

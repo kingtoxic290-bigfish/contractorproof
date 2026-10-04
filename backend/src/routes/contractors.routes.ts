@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { requirePermission } from "../authz/permissions";
-import { getContractor, listContractors } from "../controllers/contractors.controller";
+import {
+  getContractor,
+  getContractorPassport,
+  getOwnContractorPassport,
+  listContractors,
+} from "../controllers/contractors.controller";
 import {
   getContractorCrbVerifications,
   verifyContractorWithCrb,
@@ -12,6 +17,15 @@ export const contractorsRouter = Router();
 
 // Authentication is required for all contractor routes.
 contractorsRouter.use(authenticate);
+
+// Own-passport alias. Declared before "/:contractorId/passport" so "me" is never
+// read as a contractor id; the id comes from the JWT, never the query string.
+contractorsRouter.get("/me/passport", getOwnContractorPassport);
+
+contractorsRouter.get(
+  "/:contractorId/passport",
+  getContractorPassport,
+);
 
 // CRB sub-resource is declared before "/:contractorId" so the concrete path is
 // always matched. Reading is permitted for a contractor's own record; running a
